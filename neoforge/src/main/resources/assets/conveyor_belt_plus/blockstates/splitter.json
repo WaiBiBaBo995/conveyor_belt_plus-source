@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": {"model": "conveyor_belt_plus:block/splitter"},
+    "facing=east": {"model": "conveyor_belt_plus:block/splitter", "y": 90},
+    "facing=south": {"model": "conveyor_belt_plus:block/splitter", "y": 180},
+    "facing=west": {"model": "conveyor_belt_plus:block/splitter", "y": 270}
+  }
+}

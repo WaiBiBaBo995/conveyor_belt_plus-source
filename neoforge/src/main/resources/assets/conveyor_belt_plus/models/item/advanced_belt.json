@@ -1,0 +1,37 @@
+{
+	"format_version": "1.21.11",
+	"credit": "Made with Blockbench",
+	"parent": "minecraft:block/block",
+	"textures": {
+		"particle": "conveyor_belt_plus:block/advanced_belt",
+		"belt": "conveyor_belt_plus:block/advanced_belt"
+	},
+	"elements": [
+		{
+			"from": [1, 5, 1],
+			"to": [15, 7, 15],
+			"faces": {
+				"north": {"uv": [0, 16, 16, 0], "texture": "#belt"},
+				"east": {"uv": [0, 0, 2, 16], "texture": "#belt"},
+				"south": {"uv": [0, 0, 16, 16], "texture": "#belt"},
+				"west": {"uv": [14, 0, 16, 16], "texture": "#belt"},
+				"up": {"uv": [0, 0, 16, 16], "texture": "#belt"},
+				"down": {"uv": [0, 16, 16, 0], "texture": "#belt"}
+			}
+		}
+	],
+	"display": {
+		"ground": {
+			"translation": [0, 3, 0],
+			"scale": [0.5, 0.5, 0.5]
+		},
+		"gui": {
+			"rotation": [30, -135, 0],
+			"scale": [0.8, 0.8, 0.8]
+		},
+		"fixed": {
+			"rotation": [0, -180, 0],
+			"scale": [0.5, 0.5, 0.5]
+		}
+	}
+}

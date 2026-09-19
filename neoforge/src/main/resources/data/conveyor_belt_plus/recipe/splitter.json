@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["iri", "rhr", "iri"],
+  "key": {
+    "i": {"item": "minecraft:iron_ingot"},
+    "r": {"item": "minecraft:redstone"},
+    "h": {"item": "minecraft:hopper"}
+  },
+  "result": {"count": 1, "id": "conveyor_belt_plus:splitter"}
+}

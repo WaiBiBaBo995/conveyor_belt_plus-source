@@ -1,0 +1,149 @@
+plugins { id 'dev.architectury.loom' }
+base { archivesName = "${rootProject.archives_name}-neoforge" }
+repositories {
+    maven { url 'https://maven.neoforged.net/releases/' }
+    maven { url 'https://maven.blamejared.com/' }
+    maven { url 'https://api.modrinth.com/maven' }
+    maven { url 'https://maven.ryanhcode.dev/releases' }
+}
+dependencies {
+    minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
+    mappings loom.layered {
+        it.mappings("net.fabricmc:yarn:$rootProject.yarn_mappings:v2")
+        it.mappings("dev.architectury:yarn-mappings-patch-neoforge:$rootProject.yarn_mappings_patch_neoforge_version")
+    }
+    neoForge "net.neoforged:neoforge:$rootProject.neoforge_version"
+    modCompileOnly "mezz.jei:jei-$rootProject.minecraft_version-common-api:$rootProject.jei_version"
+    modCompileOnly "maven.modrinth:jade:$rootProject.jade_version"
+    modCompileOnly "maven.modrinth:rts-building-build-from-above:$rootProject.rts_version"
+    if (providers.gradleProperty('withJade').getOrElse('false').toBoolean())
+        modRuntimeOnly "maven.modrinth:jade:$rootProject.jade_version"
+    if (providers.gradleProperty('withRts').getOrElse('false').toBoolean()) {
+        modRuntimeOnly "maven.modrinth:rts-building-build-from-above:$rootProject.rts_version"
+        // Loom removes nested jars while remapping mods. Restore RTS's own bundled
+        // coordinate adapter in development only; never bundle it in our mod.
+        modRuntimeOnly 'dev.ryanhcode.sable-companion:sable-companion-common-1.21.1:1.6.0'
+    }
+    if (providers.gradleProperty('withJei').getOrElse('false').toBoolean())
+        modRuntimeOnly("mezz.jei:jei-$rootProject.minecraft_version-neoforge:$rootProject.jei_version") { transitive false }
+}
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+// Optional integration tests use the real RTS API; no stubs enter the release jar.
+if (providers.gradleProperty('withRts').getOrElse('false').toBoolean())
+    sourceSets.test.java.srcDir 'src/compatTest/java'
+if (providers.gradleProperty('withJade').getOrElse('false').toBoolean())
+    sourceSets.test.java.srcDir 'src/jadeTest/java'
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = 'UTF-8'
+}
+loom {
+    mods { conveyor_belt_plus { sourceSet sourceSets.main } }
+    runs {
+        client {
+            if (providers.gradleProperty('smokeRun').getOrElse('false').toBoolean())
+                runDir 'run-smoke-conveyor-belt-plus'
+        }
+        gameTest {
+            server()
+            source sourceSets.test
+            runDir 'run-gametest-conveyor-belt-plus'
+            property 'neoforge.gameTestServer', 'true'
+            property 'neoforge.enabledGameTestNamespaces', 'conveyor_belt_plus'
+            mods {
+                conveyor_belt_plus {
+                    sourceSet sourceSets.main
+                    sourceSet sourceSets.test
+                }
+            }
+        }
+    }
+}
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
+    from(rootProject.projectDir) {
+        include 'LICENSE'
+    }
+}
+tasks.named('sourcesJar') {
+    from(rootProject.projectDir) {
+        include 'LICENSE'
+    }
+}
+tasks.register('regressionTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'pureneko.conveyor_belt_plus.ConveyorRegressionTests'
+}
+tasks.named('runGameTest') { dependsOn testClasses }
+// Generated NBT is test-only, never copied into the release jar.
+def testTemplates = layout.buildDirectory.dir('generated-test-resources')
+sourceSets.test.resources.srcDir(testTemplates)
+tasks.register('generateGameTestTemplate') {
+    outputs.dir(testTemplates)
+    doLast {
+        def output = testTemplates.get().file('data/conveyor_belt_plus/structure/empty.nbt').asFile
+        output.parentFile.mkdirs()
+        new DataOutputStream(new java.util.zip.GZIPOutputStream(new FileOutputStream(output))).withCloseable { out ->
+            out.writeByte(10); out.writeUTF('')
+            out.writeByte(9); out.writeUTF('size'); out.writeByte(3); out.writeInt(3)
+            out.writeInt(16); out.writeInt(6); out.writeInt(16)
+            out.writeByte(9); out.writeUTF('entities'); out.writeByte(10); out.writeInt(0)
+            out.writeByte(9); out.writeUTF('blocks'); out.writeByte(10); out.writeInt(0)
+            out.writeByte(9); out.writeUTF('palette'); out.writeByte(10); out.writeInt(1)
+            out.writeByte(8); out.writeUTF('Name'); out.writeUTF('minecraft:air'); out.writeByte(0)
+            out.writeByte(0)
+        }
+    }
+}
+tasks.named('processTestResources') { dependsOn 'generateGameTestTemplate' }
+tasks.named('test') {
+    // Tests use JavaExec and NeoForge GameTest; support classes are not JUnit tests.
+    exclude '**/*Tests*'
+    failOnNoDiscoveredTests = false
+    dependsOn 'regressionTest', 'runGameTest'
+}
+tasks.register('resourceIntegrityTest') {
+    dependsOn processResources
+    doLast {
+        def root = tasks.processResources.destinationDir
+        def images = fileTree(root).matching { include '**/*.png' }.files
+        images.each { file ->
+            if (javax.imageio.ImageIO.read(file) == null) throw new GradleException("Invalid PNG: $file")
+        }
+        fileTree(root).matching { include '**/*.json', '**/*.mcmeta' }.files.each { file ->
+            new groovy.json.JsonSlurper().parse(file, 'UTF-8')
+        }
+        // Imported models must not leave dangling local blockstate/model/texture references.
+        def requireAsset = { String id, String folder, String extension ->
+            if (id.startsWith('conveyor_belt_plus:')) {
+                def path = id.substring('conveyor_belt_plus:'.length())
+                if (!new File(root, "assets/conveyor_belt_plus/$folder/$path.$extension").isFile())
+                    throw new GradleException("Missing local $folder reference: $id")
+            }
+        }
+        Closure visitModel
+        visitModel = { node ->
+            if (node instanceof Map) {
+                node.each { key, value ->
+                    if ((key == 'parent' || key == 'model') && value instanceof String)
+                        requireAsset(value, 'models', 'json')
+                    if (key == 'textures' && value instanceof Map)
+                        value.values().each { id -> if (id instanceof String) requireAsset(id, 'textures', 'png') }
+                    if (key == 'texture' && value instanceof String) requireAsset(value, 'textures', 'png')
+                    visitModel(value)
+                }
+            } else if (node instanceof List) node.each { visitModel(it) }
+        }
+        fileTree(root).matching {
+            include 'assets/conveyor_belt_plus/models/**/*.json', 'assets/conveyor_belt_plus/blockstates/*.json'
+        }.files.each { visitModel(new groovy.json.JsonSlurper().parse(it, 'UTF-8')) }
+        logger.lifecycle('Conveyor Belt Plus: ' + images.size() + ' PNGs and all resource JSON validated.')
+    }
+}
+tasks.named('check') { dependsOn 'resourceIntegrityTest' }

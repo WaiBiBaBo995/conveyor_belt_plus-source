@@ -1,0 +1,156 @@
+package pureneko.conveyor_belt_plus;
+
+import io.netty.buffer.Unpooled;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import pureneko.conveyor_belt_plus.filter.FilterRule;
+import pureneko.conveyor_belt_plus.filter.FilterRules;
+import pureneko.conveyor_belt_plus.network.FilterNetworking;
+
+import java.util.List;
+
+public final class FilterRuleTests {
+    private static int checks;
+    public static void run(RegistryWrapper.WrapperLookup lookup) {
+        matchingAndEditing(lookup);
+        capacitiesAndPersistence(lookup);
+        networking(lookup);
+        System.out.println("Conveyor Belt Plus: " + checks + " filter and packet checks passed.");
+    }
+
+    private static void matchingAndEditing(RegistryWrapper.WrapperLookup lookup) {
+        var sword = new ItemStack(Items.DIAMOND_SWORD);
+        sword.set(DataComponentTypes.DAMAGE, 3);
+        sword.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Priority"));
+        var differentlyDamaged = sword.copy();
+        differentlyDamaged.set(DataComponentTypes.DAMAGE, 7);
+        var item = FilterRule.item(sword, false);
+        var exact = FilterRule.item(sword, true);
+        check(item.matches(differentlyDamaged), "item rule ignores components");
+        check(exact.matches(sword) && !exact.matches(differentlyDamaged), "component rule compares exact damage");
+        check(!item.matches(new ItemStack(Items.IRON_SWORD)), "item type must match");
+        var renamed = sword.copy();
+        renamed.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Other"));
+        check(!exact.matches(renamed), "component rule compares exact names");
+        check(exact.matches(sword.copyWithCount(32)), "count is not a component predicate");
+        var exported = exact.prototype();
+        exported.set(DataComponentTypes.DAMAGE, 99);
+        check(exact.matches(sword), "marker access cannot mutate stored rule");
+        String initial = FilterRule.componentsText(sword, lookup);
+        check(FilterRule.editComponents(sword, initial, lookup).matches(sword), "editable component text round trip");
+        var edited = FilterRule.editComponents(sword, "{\"minecraft:damage\":7}", lookup);
+        check(edited.kind() == FilterRule.Kind.COMPONENTS && edited.prototype().getDamage() == 7,
+                "edited damage becomes exact filter");
+        check(!edited.prototype().contains(DataComponentTypes.CUSTOM_NAME), "omitted patch keys return to default components");
+        check(sword.getDamage() == 3 && sword.getName().getString().equals("Priority"), "editing never modifies real source item");
+        check(FilterRule.editComponents(sword, "{\"minecraft:damage\":3,\"minecraft:custom_name\":'\"Priority\"'}", lookup)
+                .matches(sword), "manual component values use Minecraft codecs");
+        var potion = new ItemStack(Items.POTION);
+        var healing = FilterRule.editComponents(potion, "{\"minecraft:potion_contents\":{potion:\"minecraft:healing\"}}", lookup);
+        var strongHealing = FilterRule.editComponents(potion, "{\"minecraft:potion_contents\":{potion:\"minecraft:strong_healing\"}}", lookup);
+        check(healing.matches(healing.prototype()) && !healing.matches(strongHealing.prototype()), "exact potion contents");
+        check(FilterRule.fromText(healing.toText(lookup), lookup).sameRule(healing), "registry-backed potion round-trip");
+        var sharpness3 = FilterRule.editComponents(sword, "{\"minecraft:enchantments\":{levels:{\"minecraft:sharpness\":3}}}", lookup);
+        var sharpness4 = FilterRule.editComponents(sword, "{\"minecraft:enchantments\":{levels:{\"minecraft:sharpness\":4}}}", lookup);
+        check(!sharpness3.matches(sharpness4.prototype()) && sharpness3.matches(sharpness3.prototype()), "exact enchantment levels");
+        check(FilterRule.fromText(sharpness3.toText(lookup), lookup).sameRule(sharpness3), "dynamic-registry enchantment round-trip");
+        rejects(() -> FilterRule.editComponents(sword, "{\"missing:component\":4}", lookup), "unknown component rejected");
+        rejects(() -> FilterRule.editComponents(sword, "{\"minecraft:damage\":\"not_a_number\"}", lookup), "invalid component value rejected");
+        rejects(() -> FilterRule.editComponents(sword, "{broken", lookup), "malformed SNBT rejected");
+        rejects(() -> FilterRule.editComponents(sword, " ".repeat(FilterRule.MAX_COMPONENT_TEXT + 1), lookup), "oversized edit rejected");
+        rejects(() -> FilterRule.fromText("{x:".repeat(40) + "0" + "}".repeat(40), lookup), "excessive nesting rejected");
+        rejects(() -> FilterRule.fromText("{kind:\"UNKNOWN\"}", lookup), "unknown rule kind rejected");
+        rejects(() -> FilterRule.tag("missing_namespace"), "tag namespace is mandatory");
+        rejects(() -> FilterRule.tag("minecraft:INVALID"), "invalid tag syntax rejected");
+
+        var tagKey = TagKey.of(RegistryKeys.ITEM, Identifier.of("conveyor_belt_plus_test", "logs"));
+        var allTags = Registries.ITEM.streamTagsAndEntries().collect(java.util.stream.Collectors.toMap(
+                com.mojang.datafixers.util.Pair::getFirst, pair -> pair.getSecond().stream().toList()));
+        allTags.put(tagKey, List.<RegistryEntry<net.minecraft.item.Item>>of(Items.OAK_LOG.getRegistryEntry(), Items.BIRCH_LOG.getRegistryEntry()));
+        Registries.ITEM.populateTags(allTags);
+        var tag = FilterRule.tag("#conveyor_belt_plus_test:logs");
+        check(tag.matches(new ItemStack(Items.OAK_LOG)) && tag.matches(new ItemStack(Items.BIRCH_LOG))
+                && !tag.matches(new ItemStack(Items.STONE)), "tag matches all member item types");
+        check(tag.icon().isOf(Items.OAK_LOG), "tag has representative icon");
+        allTags.put(tagKey, List.<RegistryEntry<net.minecraft.item.Item>>of(Items.SPRUCE_LOG.getRegistryEntry()));
+        Registries.ITEM.populateTags(allTags);
+        check(!tag.matches(new ItemStack(Items.OAK_LOG)) && tag.matches(new ItemStack(Items.SPRUCE_LOG)),
+                "existing rule follows tag reload, not a frozen list of items");
+        check(!FilterRule.tag("missing:valid_tag").matches(new ItemStack(Items.OAK_LOG)), "unknown tag matches nothing");
+        for (var rule : List.of(FilterRule.EMPTY, item, exact, edited, tag)) {
+            var restored = FilterRule.fromText(rule.toText(lookup), lookup);
+            check(restored.sameRule(rule), "every rule kind round-trips with exact components");
+        }
+        check(!FilterRule.EMPTY.matches(sword), "empty rule never matches");
+    }
+
+    private static void capacitiesAndPersistence(RegistryWrapper.WrapperLookup lookup) {
+        var rules = new FilterRules();
+        var iron = new ItemStack(Items.IRON_INGOT);
+        check(rules.allows(iron, 5, false) && !rules.allows(iron, 5, true), "empty blacklist allows; empty whitelist blocks");
+        for (int i = 0; i < 5; i++) check(rules.set(i, 5, FilterRule.item(new ItemStack(Items.STONE), false)), "fill standard limit");
+        check(!rules.set(5, 5, FilterRule.item(iron, false)) && rules.used(5) == 5, "standard limit is enforced");
+        check(!rules.set(-1, 5, FilterRule.item(iron, false)), "negative slot rejected");
+        check(rules.set(0, 5, FilterRule.item(iron, true)), "replace existing rule at full capacity");
+        check(rules.allows(iron, 5, true) && !rules.allows(iron, 5, false), "blacklist and whitelist share matching semantics");
+        check(rules.set(7, 10, FilterRule.tag("conveyor_belt_plus_test:logs")), "tag rule uses one advanced slot");
+        check(rules.set(14, 15, FilterRule.item(new ItemStack(Items.GOLD_INGOT), true)), "last ultimate slot accepted");
+        check(!rules.set(15, 15, FilterRule.item(iron, false)), "ultimate limit is enforced");
+        check(rules.set(53, 54, FilterRule.item(new ItemStack(Items.DIAMOND), false)), "configured multi-page limit accepted");
+        check(!rules.set(54, 55, FilterRule.item(iron, false)), "hard storage ceiling enforced");
+        check(!rules.allows(new ItemStack(Items.DIAMOND), 15, true), "out-of-limit rules are dormant");
+        var nbt = new NbtCompound();
+        rules.write(nbt, lookup);
+        var restored = new FilterRules();
+        restored.read(nbt, lookup);
+        check(restored.get(53).sameRule(rules.get(53)) && restored.allows(new ItemStack(Items.DIAMOND), 54, true),
+                "lowering capacity never deletes dormant rules");
+        check(restored.get(7).sameRule(rules.get(7)) && restored.get(14).sameRule(rules.get(14)), "all rule kinds persist");
+        var legacy = new NbtCompound();
+        var list = new NbtList();
+        for (int i = 0; i < 18; i++) list.add(new ItemStack(Items.IRON_INGOT).encode(lookup));
+        legacy.put("filters", list);
+        restored.read(legacy, lookup);
+        check(restored.get(17).kind() == FilterRule.Kind.COMPONENTS, "legacy eighteenth marker retained with exact semantics");
+        check(restored.used(15) == 15 && restored.used(18) == 18, "legacy overflow remains dormant rather than lost");
+        check(restored.set(0, 15, FilterRule.EMPTY) && restored.used(15) == 14, "clearing frees a rule slot");
+    }
+
+    private static void networking(RegistryWrapper.WrapperLookup lookup) {
+        var raw = FilterRule.item(new ItemStack(Items.DIAMOND), true).toText(lookup);
+        var registry = DynamicRegistryManager.of(Registries.REGISTRIES);
+        var buf = new RegistryByteBuf(Unpooled.buffer(), registry);
+        try {
+            var edit = new FilterNetworking.Edit(7, 14, raw);
+            FilterNetworking.Edit.CODEC.encode(buf, edit);
+            check(FilterNetworking.Edit.CODEC.decode(buf).equals(edit), "ghost edit packet round-trip");
+            buf.clear();
+            var state = new FilterNetworking.Snapshot(7, true, java.util.Collections.nCopies(54, raw), "");
+            FilterNetworking.Snapshot.CODEC.encode(buf, state);
+            check(FilterNetworking.Snapshot.CODEC.decode(buf).equals(state), "maximum-capacity snapshot round-trip");
+            buf.clear();
+            buf.writeVarInt(1);
+            buf.writeBoolean(false);
+            buf.writeVarInt(55);
+            rejects(() -> FilterNetworking.Snapshot.CODEC.decode(buf), "oversized rule array rejected before allocation");
+        } finally { buf.release(); }
+    }
+
+    private static void check(boolean ok, String message) { checks++; if (!ok) throw new AssertionError(message); }
+    private static void rejects(Runnable action, String message) {
+        try { action.run(); } catch (IllegalArgumentException exception) { check(true, message); return; }
+        throw new AssertionError(message);
+    }
+}

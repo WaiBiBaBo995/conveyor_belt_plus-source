@@ -1,0 +1,25 @@
+# Local build tools and generated output
+.gradle/
+.gradle-user*/
+.architectury-transformer/
+build/
+logs/
+*.log
+
+# Development runs may contain personal worlds and configuration
+run/
+run-*/
+
+# IDE state
+.idea/
+*.iml
+.vscode/
+
+# Inactive platforms, migration copies and reference material
+/common/
+/fabric/
+/.migration-backups/
+/.backup-*/
+/.upstream*/
+/output/
+/*.zip

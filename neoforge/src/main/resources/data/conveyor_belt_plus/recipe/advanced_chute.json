@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " R ",
+    "GCG",
+    " R "
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "C": {
+      "item": "conveyor_belt_plus:chute"
+    }
+  },
+  "result": {
+    "id": "conveyor_belt_plus:advanced_chute",
+    "count": 1
+  }
+}

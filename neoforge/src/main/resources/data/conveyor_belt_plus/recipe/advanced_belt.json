@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "b": {
+      "item": "conveyor_belt_plus:belt"
+    },
+    "r": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    "rrr",
+    "rbr",
+    "rrr"
+  ],
+  "result": {
+    "count": 8,
+    "id": "conveyor_belt_plus:advanced_belt"
+  }
+}

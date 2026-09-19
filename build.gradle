@@ -1,0 +1,35 @@
+plugins {
+    id 'base'
+    // Build-time mapping/remapping only; the installed mod has no Architectury dependency.
+    id 'dev.architectury.loom' version '1.10-SNAPSHOT' apply false
+}
+allprojects {
+    group = 'conveyor_belt_plus'
+    version = rootProject.mod_version
+}
+tasks.named('build') { dependsOn ':neoforge:build' }
+tasks.named('clean') { dependsOn ':neoforge:clean' }
+
+// Explicit inputs keep caches, worlds, old archives and generated files out of the source release.
+tasks.register('sourceZip', Zip) {
+    group = 'distribution'
+    description = 'Run all checks and package the complete, buildable project source.'
+    dependsOn ':neoforge:check'
+    archiveFileName = "${rootProject.archives_name}-${project.version}-source.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    includeEmptyDirs = false
+
+    into("${rootProject.archives_name}-${project.version}-source") {
+        from(rootDir) {
+            include '.gitignore', '.gitattributes', 'LICENSE', 'readme.md', 'CHANGELOG.md'
+            include 'build.gradle', 'settings.gradle', 'gradle.properties', 'gradlew.bat'
+            include 'gradle/wrapper/gradle-wrapper.jar', 'gradle/wrapper/gradle-wrapper.properties'
+            include 'neoforge/build.gradle', 'neoforge/gradle.properties', 'neoforge/src/**'
+        }
+        from('gradlew') {
+            filePermissions { unix('rwxr-xr-x') }
+        }
+    }
+}
