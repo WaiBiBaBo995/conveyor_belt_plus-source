@@ -39,7 +39,7 @@ Limits remain: belt speeds 0.1..64 blocks/s, chute batches 1..64 stacks, total f
 
 ## Development
 
-All active source and resources are under `neoforge/src`; Fabric/common projects, Architectury registries/networking/menu helpers, unused access wideners and mixin metadata have been removed.
+All active source and resources are under `neoforge/src`.
 
 The Gradle mapping/remapping tool remains Architectury Loom with Yarn mappings. This is **build tooling only**, not an installed-mod dependency. There is no Architectury API in the development runtime or release jar.
 
@@ -125,7 +125,7 @@ JEI、Jade 和 RTS Building 为可选。请替换之前的 jar，而不是同时
 
 ## 开发
 
-所有活动源码和资源都位于 `neoforge/src` 下；Fabric/common 项目、Architectury 注册表/网络/菜单辅助、未使用的 access widener 和 mixin 元数据已移除。
+所有活动源码和资源都位于 `neoforge/src` 下。
 
 Gradle 映射/重映射工具仍是使用 Yarn 映射的 Architectury Loom。这**仅是构建工具**，不是已安装模组依赖。开发运行时或发布 jar 中没有 Architectury API。
 
