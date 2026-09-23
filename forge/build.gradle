@@ -1,0 +1,204 @@
+plugins { id 'dev.architectury.loom' }
+base { archivesName = "${rootProject.archives_name}-forge-${rootProject.minecraft_version}" }
+repositories {
+    maven { url 'https://maven.minecraftforge.net/' }
+    maven { url 'https://maven.blamejared.com/' }
+    maven { url 'https://api.modrinth.com/maven' }
+    maven { url 'https://maven.ryanhcode.dev/releases' }
+}
+dependencies {
+    minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
+    mappings "net.fabricmc:yarn:$rootProject.yarn_mappings:v2"
+    forge "net.minecraftforge:forge:$rootProject.minecraft_version-$rootProject.forge_version"
+    modCompileOnly "mezz.jei:jei-$rootProject.minecraft_version-common-api:$rootProject.jei_version"
+    modCompileOnly "maven.modrinth:jade:$rootProject.jade_version"
+    modCompileOnly "maven.modrinth:rts-building-build-from-above:$rootProject.rts_version"
+    if (providers.gradleProperty('withJade').getOrElse('false').toBoolean())
+        modRuntimeOnly "maven.modrinth:jade:$rootProject.jade_version"
+    if (providers.gradleProperty('withRts').getOrElse('false').toBoolean()) {
+        modRuntimeOnly "maven.modrinth:rts-building-build-from-above:$rootProject.rts_version"
+    }
+    if (providers.gradleProperty('withJei').getOrElse('false').toBoolean())
+        modRuntimeOnly("mezz.jei:jei-$rootProject.minecraft_version-forge:$rootProject.jei_version") { transitive false }
+}
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+// Optional integration tests use the real RTS API; no stubs enter the release jar.
+if (providers.gradleProperty('withRts').getOrElse('false').toBoolean())
+    sourceSets.test.java.srcDir 'src/compatTest/java'
+if (providers.gradleProperty('withJade').getOrElse('false').toBoolean())
+    sourceSets.test.java.srcDir 'src/jadeTest/java'
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xmaxerrs', '500']
+}
+def integrationRuntime = ['withRts', 'withJade', 'withJei'].any {
+    providers.gradleProperty(it).getOrElse('false').toBoolean()
+}
+// Keep optional-mod registries out of the base test world's save data.
+def gameTestDirectory = integrationRuntime ? 'run-gametest-integrations-forge-1.20.1' : 'run-gametest-forge-1.20.1'
+loom {
+    mods { conveyor_belt_plus { sourceSet sourceSets.main } }
+    runs {
+        client {
+            if (providers.gradleProperty('smokeRun').getOrElse('false').toBoolean())
+                runDir 'run-smoke-conveyor-belt-plus'
+        }
+        gameTest {
+            server()
+            source sourceSets.test
+            runDir gameTestDirectory
+            property 'forge.gameTestServer', 'true'
+            property 'forge.enabledGameTestNamespaces', 'conveyor_belt_plus'
+            mods {
+                conveyor_belt_plus {
+                    sourceSet sourceSets.main
+                    sourceSet sourceSets.test
+                }
+            }
+        }
+    }
+}
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/mods.toml') { expand version: project.version }
+    from(rootProject.projectDir) {
+        include 'LICENSE'
+    }
+}
+tasks.named('sourcesJar') {
+    from(rootProject.projectDir) {
+        include 'LICENSE'
+    }
+}
+tasks.register('regressionTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'pureneko.conveyor_belt_plus.ConveyorRegressionTests'
+}
+tasks.named('runGameTest') { dependsOn testClasses }
+// Generated NBT is test-only, never copied into the release jar.
+def testTemplates = layout.buildDirectory.dir('generated-test-resources')
+sourceSets.test.resources.srcDir(testTemplates)
+tasks.register('generateGameTestTemplate') {
+    outputs.dir(testTemplates)
+    doLast {
+        def output = testTemplates.get().file('data/conveyor_belt_plus/structures/empty.nbt').asFile
+        output.parentFile.mkdirs()
+        new DataOutputStream(new java.util.zip.GZIPOutputStream(new FileOutputStream(output))).withCloseable { out ->
+            out.writeByte(10); out.writeUTF('')
+            out.writeByte(9); out.writeUTF('size'); out.writeByte(3); out.writeInt(3)
+            out.writeInt(16); out.writeInt(6); out.writeInt(16)
+            out.writeByte(9); out.writeUTF('entities'); out.writeByte(10); out.writeInt(0)
+            out.writeByte(9); out.writeUTF('blocks'); out.writeByte(10); out.writeInt(0)
+            out.writeByte(9); out.writeUTF('palette'); out.writeByte(10); out.writeInt(1)
+            out.writeByte(8); out.writeUTF('Name'); out.writeUTF('minecraft:air'); out.writeByte(0)
+            out.writeByte(0)
+        }
+    }
+}
+tasks.named('processTestResources') { dependsOn 'generateGameTestTemplate' }
+tasks.named('test') {
+    // Tests use JavaExec and Forge GameTest; support classes are not JUnit tests.
+    exclude '**/*Tests*'
+    dependsOn 'regressionTest', 'runGameTest'
+}
+tasks.register('resourceIntegrityTest') {
+    dependsOn processResources
+    doLast {
+        def root = tasks.processResources.destinationDir
+        def images = fileTree(root).matching { include '**/*.png' }.files
+        images.each { file ->
+            if (javax.imageio.ImageIO.read(file) == null) throw new GradleException("Invalid PNG: $file")
+        }
+        fileTree(root).matching { include '**/*.json', '**/*.mcmeta' }.files.each { file ->
+            new groovy.json.JsonSlurper().parse(file, 'UTF-8')
+        }
+        // Imported models must not leave dangling local blockstate/model/texture references.
+        def requireAsset = { String id, String folder, String extension ->
+            if (id.startsWith('conveyor_belt_plus:')) {
+                def path = id.substring('conveyor_belt_plus:'.length())
+                if (!new File(root, "assets/conveyor_belt_plus/$folder/$path.$extension").isFile())
+                    throw new GradleException("Missing local $folder reference: $id")
+            }
+        }
+        Closure visitModel
+        visitModel = { node ->
+            if (node instanceof Map) {
+                node.each { key, value ->
+                    if ((key == 'parent' || key == 'model') && value instanceof String)
+                        requireAsset(value, 'models', 'json')
+                    if (key == 'textures' && value instanceof Map)
+                        value.values().each { id -> if (id instanceof String) requireAsset(id, 'textures', 'png') }
+                    if (key == 'texture' && value instanceof String) requireAsset(value, 'textures', 'png')
+                    visitModel(value)
+                }
+            } else if (node instanceof List) node.each { visitModel(it) }
+        }
+        fileTree(root).matching {
+            include 'assets/conveyor_belt_plus/models/**/*.json', 'assets/conveyor_belt_plus/blockstates/*.json'
+        }.files.each { visitModel(new groovy.json.JsonSlurper().parse(it, 'UTF-8')) }
+        logger.lifecycle('Conveyor Belt Plus: ' + images.size() + ' PNGs and all resource JSON validated.')
+    }
+}
+tasks.named('check') { dependsOn 'resourceIntegrityTest' }
+
+tasks.withType(JavaExec).configureEach {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+}
+
+// Forge may exit with code 0 on mod-loading failure, before running any tests.
+// Require positive evidence of a completed suite as well as the process exit code.
+tasks.named('runGameTest') {
+    doFirst {
+        def run = file(gameTestDirectory)
+        run.mkdirs()
+        file("$run/logs/latest.log").with { if (exists()) text = '' }
+    }
+    doLast {
+        def log = file("$gameTestDirectory/logs/latest.log")
+        if (!log.isFile() || !(log.getText('UTF-8') =~ /All \d+ required tests passed/))
+            throw new GradleException('Forge GameTest did not complete successfully; inspect the test server log.')
+    }
+}
+
+if (providers.gradleProperty('withRts').getOrElse('false').toBoolean()
+        || providers.gradleProperty('withJade').getOrElse('false').toBoolean())
+    apply from: rootProject.file('gradle/integration-development.gradle')
+
+// Opt-in real-client rendering/menu check, using a copied disposable GameTest world.
+if (providers.gradleProperty('clientSmokeTests').getOrElse('false').toBoolean()) {
+    sourceSets.test.java.srcDir 'src/clientTest/java'
+    loom.runs.client {
+        source sourceSets.test
+        runDir 'run-smoke-conveyor-belt-plus'
+        mods {
+            conveyor_belt_plus {
+                sourceSet sourceSets.main
+                sourceSet sourceSets.test
+            }
+        }
+    }
+    tasks.named('runClient') {
+        dependsOn testClasses
+        doFirst {
+            def source = file("$gameTestDirectory/world")
+            if (!new File(source, 'level.dat').isFile()) throw new GradleException('Run :forge:runGameTest before clientSmokeTests.')
+            project.sync {
+                from source
+                into file('run-smoke-conveyor-belt-plus/saves/ForgePortSmoke')
+                exclude 'session.lock', 'playerdata/**'
+            }
+            file('run-smoke-conveyor-belt-plus/smoke-success.txt').with { if (exists()) text = '' }
+        }
+        doLast {
+            def result = file('run-smoke-conveyor-belt-plus/smoke-success.txt')
+            if (!result.isFile() || !result.text.contains('passed')) throw new GradleException('Client smoke test did not finish.')
+        }
+    }
+}

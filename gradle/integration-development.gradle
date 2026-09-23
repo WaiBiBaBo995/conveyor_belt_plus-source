@@ -1,0 +1,97 @@
+buildscript {
+    repositories { mavenCentral() }
+    dependencies { classpath 'org.ow2.asm:asm-tree:9.8' }
+}
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.tree.AnnotationNode
+import org.objectweb.asm.tree.ClassNode
+import java.util.zip.ZipFile
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+// RTS 1.1.8-beta and Jade 11.13.3 ship remap=false selectors/aliases with SRG names.
+// They work in production Forge but cannot match Yarn development method names.
+// Adapt only annotation selectors in a build-local copy of Loom's remapped JAR.
+// Never change dependency caches, implementation bytecode, or the release mod.
+def developmentJars = [:]
+if (providers.gradleProperty('withRts').getOrElse('false').toBoolean())
+    developmentJars["rts-building-build-from-above-${rootProject.rts_version}.jar".toString()] = 'rts'
+if (providers.gradleProperty('withJade').getOrElse('false').toBoolean())
+    developmentJars["jade-${rootProject.jade_version}.jar".toString()] = 'jade'
+if (!developmentJars.isEmpty()) {
+    tasks.withType(JavaExec).configureEach {
+        if (name in ['runClient', 'runServer', 'runGameTest']) {
+            // Snapshot the underlying providers before replacing the task's collection.
+            def originalClasspath = files(new ArrayList(classpath.from))
+            def targetFiles = developmentJars.collectEntries { jarName, kind ->
+                [(jarName): layout.buildDirectory.file("dev-runtime/$jarName").get().asFile]
+            }
+            classpath = files(provider {
+                originalClasspath.files.collect { targetFiles.get(it.name, it) }
+            })
+            doFirst {
+                def names = [:], classes = [:]
+                loom.mappingConfiguration.srgToNamedSrg.toFile().eachLine('UTF-8') { line ->
+                    def parts = line.split(' ')
+                    if (parts[0] == 'CL:') classes[parts[1]] = parts[2]
+                    if (parts[0] in ['MD:', 'FD:']) {
+                        def source = parts[1].substring(parts[1].lastIndexOf('/') + 1)
+                        def mappedName = parts[parts[0] == 'MD:' ? 3 : 2]
+                        mappedName = mappedName.substring(mappedName.lastIndexOf('/') + 1)
+                        if (source ==~ /[mf]_\d+_/) names[source] = mappedName
+                    }
+                }
+                Closure rewrite
+                rewrite = { value ->
+                    if (value instanceof String) {
+                        def text = value.replaceAll(/[mf]_\d+_/) { name -> names.get(name, name) }
+                        return text.replaceAll(/L([^;]+);/) { full, owner -> 'L' + classes.get(owner, owner) + ';' }
+                    }
+                    if (value instanceof AnnotationNode) {
+                        for (int i = 1; value.values != null && i < value.values.size(); i += 2)
+                            value.values[i] = rewrite(value.values[i])
+                    } else if (value instanceof List) {
+                        for (int i = 0; i < value.size(); i++) value[i] = rewrite(value[i])
+                    }
+                    return value
+                }
+                developmentJars.each { jarName, kind ->
+                def original = originalClasspath.files.find { it.name == jarName }
+                if (original == null) throw new GradleException("Development runtime JAR was not found: $jarName")
+                def target = targetFiles[jarName]
+                target.parentFile.mkdirs()
+                new ZipFile(original).withCloseable { input ->
+                    new ZipOutputStream(new FileOutputStream(target)).withCloseable { output ->
+                        input.entries().each { entry ->
+                            byte[] bytes = input.getInputStream(entry).bytes
+                            if ((kind == 'rts' && entry.name.startsWith('com/rtsbuilding/rtsbuilding/mixin/') && entry.name.endsWith('.class'))
+                                    || (kind == 'jade' && entry.name == 'snownee/jade/mixin/StringRenderOutputMixin.class')) {
+                                def node = new ClassNode()
+                                new ClassReader(bytes).accept(node, 0)
+                                if (kind == 'rts') {
+                                    rewrite(node.visibleAnnotations)
+                                    rewrite(node.invisibleAnnotations)
+                                }
+                                (kind == 'rts' ? node.methods + node.fields : node.fields).each { member ->
+                                    rewrite(member.visibleAnnotations)
+                                    rewrite(member.invisibleAnnotations)
+                                }
+                                def writer = new ClassWriter(0)
+                                node.accept(writer)
+                                bytes = writer.toByteArray()
+                            }
+                            output.putNextEntry(new ZipEntry(entry.name))
+                            output.write(bytes)
+                            output.closeEntry()
+                        }
+                    }
+                }
+                // Forge's generated legacy classpath also lists discovered mods.
+                def legacy = file('.gradle/loom-cache/forge_minecraft_classpath.txt')
+                if (legacy.isFile()) legacy.text = legacy.text.replace(original.absolutePath, target.absolutePath)
+                }
+            }
+        }
+    }
+}

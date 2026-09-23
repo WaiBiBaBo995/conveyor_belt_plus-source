@@ -2,7 +2,7 @@ pluginManagement {
     repositories {
         maven { url "https://maven.fabricmc.net/" }
         maven { url "https://maven.architectury.dev/" }
-        maven { url "https://maven.neoforged.net/releases/" }
+        maven { url "https://maven.minecraftforge.net/" }
         gradlePluginPortal()
     }
 }
@@ -17,4 +17,4 @@ org.apache.tools.ant.DirectoryScanner.removeDefaultExclude('**/.gitattributes')
 
 rootProject.name = 'conveyor_belt_plus'
 
-include 'neoforge'
+include 'forge'

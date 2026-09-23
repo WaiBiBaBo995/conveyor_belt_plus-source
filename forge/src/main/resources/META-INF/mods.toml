@@ -1,0 +1,49 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+#issueTrackerURL = ""
+license = "MIT"
+
+[[mods]]
+modId = "conveyor_belt_plus"
+version = "${version}"
+displayName = "Conveyor Belt Plus"
+authors = "pureneko,sorahina309"
+description = '''
+Spline-based belts with a single-item-type splitter and safe route validation.
+'''
+logoFile = "logo.png"
+
+[[dependencies.conveyor_belt_plus]]
+modId = "forge"
+mandatory = true
+versionRange = "[47.4.10,48)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.conveyor_belt_plus]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,1.20.2)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.conveyor_belt_plus]]
+modId = "jei"
+mandatory = false
+versionRange = "[15,16)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.conveyor_belt_plus]]
+modId = "jade"
+mandatory = false
+versionRange = "[11.13,12)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.conveyor_belt_plus]]
+modId = "rtsbuilding"
+mandatory = false
+versionRange = "[1.1.8-beta,1.2)"
+ordering = "AFTER"
+side = "BOTH"
