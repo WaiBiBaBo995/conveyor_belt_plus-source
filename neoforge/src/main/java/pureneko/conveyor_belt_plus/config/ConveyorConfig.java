@@ -1,6 +1,8 @@
 package pureneko.conveyor_belt_plus.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec.Builder;
+import net.neoforged.neoforge.common.ModConfigSpec.DoubleValue;
 
 /** Native NeoForge SERVER configuration: persistence, validation, reload and sync belong to the loader. */
 public final class ConveyorConfig {
@@ -11,6 +13,8 @@ public final class ConveyorConfig {
     public static final ModConfigSpec.DoubleValue[] SPEEDS = new ModConfigSpec.DoubleValue[3];
     public static final ModConfigSpec.IntValue[] STACKS = new ModConfigSpec.IntValue[3];
     public static final ModConfigSpec.IntValue[] FILTER_LIMITS = new ModConfigSpec.IntValue[3];
+    public static final ModConfigSpec.IntValue[] FLUID_AMOUNTS = new ModConfigSpec.IntValue[3];
+    public static final ModConfigSpec.IntValue[] FLUID_FILTER_LIMITS = new ModConfigSpec.IntValue[3];
     public static final ModConfigSpec.IntValue SPLITTER_BUFFER;
     public static final ModConfigSpec.BooleanValue CHUTE_EXTRACTION_SIDES;
 
@@ -20,6 +24,12 @@ public final class ConveyorConfig {
         String[] chinese = {"普通", "高级", "终极"};
         int[] speed = {1, 2, 4}, stacks = {1, 4, 8}, filters = {5, 10, 15};
         for (int i = 0; i < names.length; i++) {
+            FLUID_AMOUNTS[i] = builder.comment(chinese[i] + "流体接口/通用接口每批抽取上限（mB）。", "Fluid and universal interface batch limit in mB.")
+                    .translation("config.conveyor_belt_plus.fluid_chute." + names[i] + ".millibuckets")
+                    .defineInRange("fluid_chute." + names[i] + ".millibuckets", new int[]{1000, 16000, 64000}[i], 1, 1_048_576);
+            FLUID_FILTER_LIMITS[i] = builder.comment(chinese[i] + "流体类型与流体标签规则数量；超出部分保留但不生效。", "Fluid type/tag rule limit; excess saved rules remain inactive.")
+                    .translation("config.conveyor_belt_plus.fluid_chute." + names[i] + ".filters")
+                    .defineInRange("fluid_chute." + names[i] + ".filters", filters[i], 1, MAX_FILTER_RULES);
             String speedKey = "belt." + names[i] + ".speed";
             String stacksKey = "chute." + names[i] + ".stacks";
             String filtersKey = "chute." + names[i] + ".filters";
@@ -58,6 +68,8 @@ public final class ConveyorConfig {
     }
     public static int chuteStacks(int tier) { return value(STACKS[Math.clamp(tier, 1, 3) - 1]); }
     public static int chuteFilters(int tier) { return value(FILTER_LIMITS[Math.clamp(tier, 1, 3) - 1]); }
+    public static int fluidAmount(int tier) { return value(FLUID_AMOUNTS[Math.clamp(tier, 1, 3) - 1]); }
+    public static int fluidFilters(int tier) { return value(FLUID_FILTER_LIMITS[Math.clamp(tier, 1, 3) - 1]); }
     public static int splitterBufferItems() { return value(SPLITTER_BUFFER); }
     public static boolean extractionSidesEnabled() { return value(CHUTE_EXTRACTION_SIDES); }
 }

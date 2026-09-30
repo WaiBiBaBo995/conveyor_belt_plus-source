@@ -1,9 +1,9 @@
 package pureneko.conveyor_belt_plus.neoforge;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
@@ -13,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
 public final class ConveyorItemApi {
     private ConveyorItemApi() {}
 
-    public static @Nullable InventoryStorage find(World world, BlockPos pos, Direction direction) {
+    public static @Nullable InventoryStorage find(Level world, BlockPos pos, Direction direction) {
         var handler = world.getCapability(Capabilities.ItemHandler.BLOCK, pos, null, null, direction);
         return handler == null ? null : new InventoryStorage(handler);
     }
@@ -35,7 +35,7 @@ public final class ConveyorItemApi {
             int total = 0;
             for (int slot = 0; slot < container.getSlots() && total < extracted.getCount(); slot++) {
                 var available = container.getStackInSlot(slot);
-                if (ItemStack.areItemsAndComponentsEqual(available, extracted)) {
+                if (ItemStack.isSameItemSameComponents(available, extracted)) {
                     total += container.extractItem(slot, extracted.getCount() - total, false).getCount();
                 }
             }

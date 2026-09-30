@@ -1,80 +1,81 @@
 package pureneko.conveyor_belt_plus.blocks;
 
 import com.mojang.serialization.MapCodec;
-import pureneko.conveyor_belt_plus.util.DirectionalShapes;
 import pureneko.conveyor_belt_plus.util.MathHelpers;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.block.ShapeContext;
-import net.minecraft.block.enums.BlockFace;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.BlockView;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
-public class ConveyorSupportBlock extends HorizontalFacingBlock {
+public class ConveyorSupportBlock extends HorizontalDirectionalBlock {
 
-    private static final DirectionalShapes SHAPES = new DirectionalShapes(ConveyorSupportBlock::createShape);
+    private static final Map<Direction, VoxelShape> SHAPES = new HashMap<>();
 
-    private static VoxelShape createShape(Direction direction) {
-        return VoxelShapes.union(
-                MathHelpers.rotateVoxelShape(VoxelShapes.cuboid(
+    private VoxelShape createShapeForDirection(Direction direction) {
+        return Shapes.or(
+                MathHelpers.rotateVoxelShape(Shapes.box(
                         7.0 / 16.0, 1.0 / 16.0, 7.0 / 16.0,
                         9.0 / 16.0, 4.0 / 16.0, 9.0 / 16.0
-                ), direction, BlockFace.FLOOR),
-                MathHelpers.rotateVoxelShape(VoxelShapes.cuboid(
+                ), direction, AttachFace.FLOOR),
+                MathHelpers.rotateVoxelShape(Shapes.box(
                         2.0 / 16.0, 4.0 / 16.0, 6.0 / 16.0,
                         14.0 / 16.0, 6.0 / 16.0, 10.0 / 16.0
-                ), direction, BlockFace.FLOOR),
-                MathHelpers.rotateVoxelShape(VoxelShapes.cuboid(
+                ), direction, AttachFace.FLOOR),
+                MathHelpers.rotateVoxelShape(Shapes.box(
                         2.0 / 16.0, 6.0 / 16.0, 6.0 / 16.0,
                         3.0 / 16.0, 7.0 / 16.0, 10.0 / 16.0
-                ), direction, BlockFace.FLOOR),
-                MathHelpers.rotateVoxelShape(VoxelShapes.cuboid(
+                ), direction, AttachFace.FLOOR),
+                MathHelpers.rotateVoxelShape(Shapes.box(
                         13.0 / 16.0, 6.0 / 16.0, 6.0 / 16.0,
                         14.0 / 16.0, 7.0 / 16.0, 10.0 / 16.0
-                ), direction, BlockFace.FLOOR),
-                MathHelpers.rotateVoxelShape(VoxelShapes.cuboid(
+                ), direction, AttachFace.FLOOR),
+                MathHelpers.rotateVoxelShape(Shapes.box(
                         4.0 / 16.0, 0.0 / 16.0, 4.0 / 16.0,
                         12.0 / 16.0, 1.0 / 16.0, 12.0 / 16.0
-                ), direction, BlockFace.FLOOR)
-        ).simplify();
+                ), direction, AttachFace.FLOOR)
+        ).optimize();
     }
 
-    public ConveyorSupportBlock(Settings settings) {
+    public ConveyorSupportBlock(Properties settings) {
         super(settings);
-        setDefaultState(getDefaultState().with(Properties.HORIZONTAL_FACING, Direction.NORTH));
+        registerDefaultState(defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(Properties.HORIZONTAL_FACING);
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(BlockStateProperties.HORIZONTAL_FACING);
     }
 
     @Override
-    protected VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        var dir = state.get(Properties.HORIZONTAL_FACING);
+    protected VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
+        var dir = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
         if (dir == Direction.SOUTH) dir = Direction.NORTH;
         if (dir == Direction.EAST) dir = Direction.WEST;
-        return SHAPES.get(dir);
+        return SHAPES.computeIfAbsent(dir, this::createShapeForDirection);
     }
 
     @Nullable
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        return Objects.requireNonNull(super.getPlacementState(ctx)).with(Properties.HORIZONTAL_FACING, ctx.getHorizontalPlayerFacing().getOpposite());
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        return Objects.requireNonNull(super.getStateForPlacement(ctx)).setValue(BlockStateProperties.HORIZONTAL_FACING, ctx.getHorizontalDirection().getOpposite());
     }
 
     @Override
-    protected MapCodec<? extends HorizontalFacingBlock> getCodec() {
+    protected MapCodec<? extends HorizontalDirectionalBlock> codec() {
         return null;
     }
 }

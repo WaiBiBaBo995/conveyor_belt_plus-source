@@ -2,19 +2,8 @@
   "type": "minecraft:block",
   "pools": [
     {
-      "bonus_rolls": 0.0,
-      "conditions": [
-        {
-          "condition": "minecraft:survives_explosion"
-        }
-      ],
-      "entries": [
-        {
-          "type": "minecraft:item",
-          "name": "conveyor_belt_plus:splitter"
-        }
-      ],
-      "rolls": 1.0
+      "rolls": 1,
+      "entries": [{"type": "minecraft:item", "name": "conveyor_belt_plus:splitter"}]
     }
   ]
 }

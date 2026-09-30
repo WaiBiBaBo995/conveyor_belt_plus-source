@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "conveyor_belt_plus:block/advanced_fluid_chute",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "conveyor_belt_plus:block/advanced_fluid_chute"
+    },
+    "facing=south": {
+      "model": "conveyor_belt_plus:block/advanced_fluid_chute",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "conveyor_belt_plus:block/advanced_fluid_chute",
+      "y": 270
+    }
+  }
+}

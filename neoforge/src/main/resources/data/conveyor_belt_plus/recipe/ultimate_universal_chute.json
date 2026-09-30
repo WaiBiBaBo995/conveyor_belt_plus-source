@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "conveyor_belt_plus:ultimate_item_chute"
+    },
+    {
+      "item": "conveyor_belt_plus:ultimate_fluid_chute"
+    }
+  ],
+  "result": {
+    "id": "conveyor_belt_plus:ultimate_universal_chute",
+    "count": 1
+  }
+}

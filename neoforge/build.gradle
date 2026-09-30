@@ -8,10 +8,7 @@ repositories {
 }
 dependencies {
     minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
-    mappings loom.layered {
-        it.mappings("net.fabricmc:yarn:$rootProject.yarn_mappings:v2")
-        it.mappings("dev.architectury:yarn-mappings-patch-neoforge:$rootProject.yarn_mappings_patch_neoforge_version")
-    }
+    mappings loom.officialMojangMappings()
     neoForge "net.neoforged:neoforge:$rootProject.neoforge_version"
     modCompileOnly "mezz.jei:jei-$rootProject.minecraft_version-common-api:$rootProject.jei_version"
     modCompileOnly "maven.modrinth:jade:$rootProject.jade_version"
@@ -51,7 +48,7 @@ loom {
         gameTest {
             server()
             source sourceSets.test
-            runDir 'run-gametest-conveyor-belt-plus'
+            runDir 'build/run-gametest-conveyor-belt-plus'
             property 'neoforge.gameTestServer', 'true'
             property 'neoforge.enabledGameTestNamespaces', 'conveyor_belt_plus'
             mods {
@@ -67,12 +64,12 @@ processResources {
     inputs.property 'version', project.version
     filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
     from(rootProject.projectDir) {
-        include 'LICENSE'
+        include 'LICENSE', 'LICENSES/**', 'THIRD_PARTY_NOTICES.md'
     }
 }
 tasks.named('sourcesJar') {
     from(rootProject.projectDir) {
-        include 'LICENSE'
+        include 'LICENSE', 'LICENSES/**', 'THIRD_PARTY_NOTICES.md'
     }
 }
 tasks.register('regressionTest', JavaExec) {

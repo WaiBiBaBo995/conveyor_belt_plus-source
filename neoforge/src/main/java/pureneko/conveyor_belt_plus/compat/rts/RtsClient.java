@@ -1,13 +1,16 @@
 package pureneko.conveyor_belt_plus.compat.rts;
 
+import com.mojang.blaze3d.platform.Window;
+import com.rtsbuilding.rtsbuilding.client.controller.ClientRtsController;
 import com.rtsbuilding.rtsbuilding.client.screen.standalone.BuilderScreen;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.MultiBufferSource.BufferSource;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -21,17 +24,17 @@ public final class RtsClient {
     private RtsClient() {}
     private static ItemStack draft = ItemStack.EMPTY;
     private static boolean wasBuilder;
-    public record View(ItemStack stack, BlockHitResult hit, Vec3d origin, Vec3d direction, Direction facing, boolean emptyHand) {}
+    public record View(ItemStack stack, BlockHitResult hit, Vec3 origin, Vec3 direction, Direction facing, boolean emptyHand) {}
     public static void setDraft(ItemStack stack) { draft = stack.copy(); }
     public static boolean jadeHidden() {
-        return MinecraftClient.getInstance().currentScreen instanceof BuilderScreen
+        return Minecraft.getInstance().screen instanceof BuilderScreen
                 && com.rtsbuilding.rtsbuilding.common.persist.RtsClientUiStateStore.isJadePanelHidden();
     }
 
     public static void tick() {
-        var client = MinecraftClient.getInstance();
-        boolean builder = client.currentScreen instanceof BuilderScreen;
-        if (client.world == null) { draft = ItemStack.EMPTY; wasBuilder = false; return; }
+        var client = Minecraft.getInstance();
+        boolean builder = client.screen instanceof BuilderScreen;
+        if (client.level == null) { draft = ItemStack.EMPTY; wasBuilder = false; return; }
         if (builder != wasBuilder) {
             draft = ItemStack.EMPTY;
             PacketDistributor.sendToServer(new RtsNetworking.DraftRequest(!builder));
@@ -39,14 +42,14 @@ public final class RtsClient {
         wasBuilder = builder;
     }
     public static View view() {
-        var client = MinecraftClient.getInstance();
-        if (!(client.currentScreen instanceof BuilderScreen screen) || client.player == null) return null;
+        var client = Minecraft.getInstance();
+        if (!(client.screen instanceof BuilderScreen screen) || client.player == null) return null;
         if (screen.isGuideOpen() || screen.isGearMenuOpen() || screen.isCraftQuantityDialogOpen()
                 || screen.isRangeCullingManagementActive() || screen.getPendingGuiBindSlot() >= 0
                 || screen.isBlueprintPlacementModeLocked()) return null;
         var window = client.getWindow();
-        var viewport = RtsUiViewport.from(window.getWidth(), window.getHeight(), window.getScaledWidth(),
-                window.getScaledHeight(), screen.getRtsGuiScale(), client.mouse.getX(), client.mouse.getY());
+        var viewport = RtsUiViewport.from(window.getScreenWidth(), window.getScreenHeight(), window.getGuiScaledWidth(),
+                window.getGuiScaledHeight(), screen.getRtsGuiScale(), client.mouseHandler.xpos(), client.mouseHandler.ypos());
         if (viewport == null) return null;
         int previousWidth = screen.width, previousHeight = screen.height;
         try {
@@ -65,26 +68,26 @@ public final class RtsClient {
         if (!mode.equals("INTERACT")) return null;
         if (controller.hasSelectedFluid()) return null;
         var selected = controller.hasSelectedItem() ? controller.getSelectedItemPreview()
-                : controller.isEmptyHandSelected() ? ItemStack.EMPTY : client.player.getMainHandStack();
+                : controller.isEmptyHandSelected() ? ItemStack.EMPTY : client.player.getMainHandItem();
         var stack = selected.copy();
         if (stack.getItem() instanceof BeltItem) {
             RtsBeltDrafts.clearSelection(stack);
-            if (draft.isOf(stack.getItem())) RtsBeltDrafts.copySelection(draft, stack);
+            if (draft.is(stack.getItem())) RtsBeltDrafts.copySelection(draft, stack);
         }
         var direction = screen.computeCursorRayDirection().normalize();
-        var facing = Direction.fromRotation(Math.toDegrees(Math.atan2(-direction.x, direction.z)));
+        var facing = Direction.fromYRot(Math.toDegrees(Math.atan2(-direction.x, direction.z)));
         return new View(stack, screen.pickBlockHit(), screen.currentRayOrigin(), direction, facing, selected.isEmpty());
     }
     public static void render(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
         var view = view();
-        var client = MinecraftClient.getInstance();
+        var client = Minecraft.getInstance();
         if (view == null || !(view.stack.getItem() instanceof BeltItem) || view.hit == null
                 || view.hit.getType() != HitResult.Type.BLOCK) return;
-        var consumers = client.getBufferBuilders().getEntityVertexConsumers();
-        BeltOutlineRenderer.renderPlannedBelt(client.world, event.getCamera(), event.getPoseStack(), consumers,
+        var consumers = client.renderBuffers().bufferSource();
+        BeltOutlineRenderer.renderPlannedBelt(client.level, event.getCamera(), event.getPoseStack(), consumers,
                 view.stack, view.hit, view.facing);
-        consumers.draw();
+        consumers.endBatch();
     }
     public static void click(ScreenEvent.MouseButtonPressed.Pre event) {
         if (event.getButton() != 1) return;
@@ -94,7 +97,8 @@ public final class RtsClient {
                 && (view.hit == null || view.hit.getType() == HitResult.Type.MISS)) {
             PacketDistributor.sendToServer(new RtsNetworking.DraftRequest(true));
             event.setCanceled(true);
-        } else if (view.emptyHand && BeltPickupTarget.takeRemote(view.origin, view.direction)) {
+        } else if (BeltPickupTarget.takeRemote(view.origin, view.direction, view.stack)
+                || BeltPickupTarget.putRemote(view.origin, view.direction, view.stack)) {
             event.setCanceled(true);
         }
     }

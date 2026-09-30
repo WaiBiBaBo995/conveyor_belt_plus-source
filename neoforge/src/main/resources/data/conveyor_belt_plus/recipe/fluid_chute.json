@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "i": {
+      "item": "minecraft:iron_ingot"
+    },
+    "p": {
+      "item": "minecraft:glass"
+    }
+  },
+  "pattern": [
+    "pip",
+    "p p",
+    "   "
+  ],
+  "result": {
+    "count": 16,
+    "id": "conveyor_belt_plus:fluid_chute"
+  }
+}
