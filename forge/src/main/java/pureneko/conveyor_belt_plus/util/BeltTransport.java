@@ -1,6 +1,8 @@
 package pureneko.conveyor_belt_plus.util;
 
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.function.Predicate;
 
 /** Shared server simulation; the deque's tail is the leading packet. */
@@ -16,6 +18,28 @@ public final class BeltTransport {
     public static <T extends Packet> boolean canLoad(Deque<T> items, double length) {
         return length > 0 && items.size() < 64
                 && (items.isEmpty() || items.getFirst().progress() >= SPACING / length);
+    }
+
+    public static <T extends Packet> boolean canInsertAt(Deque<T> items, double length, float progress) {
+        if (!Float.isFinite(progress) || progress < 0 || progress > 1 || !Double.isFinite(length)
+                || length <= 0 || items.size() >= 64) return false;
+        for (var item : items) if (Math.abs(item.progress() - progress) * length < SPACING) return false;
+        return true;
+    }
+
+    /** Preserve ascending progress so the tail remains the leading packet. */
+    public static <T extends Packet> boolean insertAt(Deque<T> items, double length, T packet) {
+        if (!canInsertAt(items, length, packet.progress())) return false;
+        var ordered = new java.util.ArrayList<T>(items.size() + 1);
+        boolean inserted = false;
+        for (var item : items) {
+            if (!inserted && packet.progress() < item.progress()) { ordered.add(packet); inserted = true; }
+            ordered.add(item);
+        }
+        if (!inserted) ordered.add(packet);
+        items.clear();
+        items.addAll(ordered);
+        return true;
     }
 
     public record Step(boolean changed, double distanceMoved) {}

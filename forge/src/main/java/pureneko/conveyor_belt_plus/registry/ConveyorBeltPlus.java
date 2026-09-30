@@ -1,7 +1,7 @@
 package pureneko.conveyor_belt_plus.registry;
 
-import net.minecraft.util.Identifier;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
@@ -27,9 +27,10 @@ public final class ConveyorBeltPlus {
         FilterNetworking.register();
         pureneko.conveyor_belt_plus.network.PickupNetworking.register();
         pureneko.conveyor_belt_plus.network.RtsNetworking.register();
+        pureneko.conveyor_belt_plus.network.InsertionNetworking.register();
         net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
                 () -> pureneko.conveyor_belt_plus.client.ConveyorBeltPlusClient::initialize);
     }
 
-    public static Identifier id(String path) { return new Identifier(MOD_ID, path); }
+    public static ResourceLocation id(String path) { return new ResourceLocation(MOD_ID, path); }
 }

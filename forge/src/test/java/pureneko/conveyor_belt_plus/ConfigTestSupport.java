@@ -5,9 +5,25 @@ import pureneko.conveyor_belt_plus.config.ConveyorConfig;
 import java.util.Properties;
 import java.util.function.Consumer;
 
-/** Test-only native-spec mutation. Never calls save or writes the running test world's config. */
+/** Test-only native-spec mutation, detached from Forge's autosaving file for each GameTest batch. */
 final class ConfigTestSupport {
     private ConfigTestSupport() {}
+    private static CommentedConfig originalConfig;
+    static void beginBatch() {
+        if (!ConveyorConfig.SPEC.isLoaded()) throw new AssertionError("Tests require the loaded Forge SERVER config");
+        originalConfig = net.minecraftforge.fml.config.ConfigTracker.INSTANCE.configSets()
+                .get(net.minecraftforge.fml.config.ModConfig.Type.SERVER).stream()
+                .filter(config -> config.getSpec() == ConveyorConfig.SPEC).findFirst().orElseThrow().getConfigData();
+        var temporary = CommentedConfig.inMemory();
+        ConveyorConfig.SPEC.correct(temporary);
+        // Forge ConfigValue.set writes through to AutosaveCommentedFileConfig, unlike NeoForge.
+        // Keep native schema/get/set behavior without racing the test world's file watcher.
+        ConveyorConfig.SPEC.acceptConfig(temporary);
+    }
+    static void endBatch() {
+        ConveyorConfig.SPEC.acceptConfig(originalConfig);
+        originalConfig = null;
+    }
     static void apply(Properties properties, Consumer<String> warn) {
         var config = CommentedConfig.inMemory();
         for (String key : properties.stringPropertyNames()) {
@@ -25,7 +41,7 @@ final class ConfigTestSupport {
         apply(config);
     }
     static void apply(CommentedConfig config) {
-        if (!ConveyorConfig.SPEC.isLoaded()) throw new AssertionError("Tests require the real loaded MinecraftForge SERVER config");
+        if (!ConveyorConfig.SPEC.isLoaded()) throw new AssertionError("Tests require the loaded Forge SERVER config");
         for (int i = 0; i < 3; i++) {
             ConveyorConfig.SPEEDS[i].set(config.<Number>get(ConveyorConfig.SPEEDS[i].getPath()).doubleValue());
             ConveyorConfig.STACKS[i].set(config.<Number>get(ConveyorConfig.STACKS[i].getPath()).intValue());

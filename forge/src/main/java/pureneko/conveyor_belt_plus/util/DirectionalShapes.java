@@ -1,11 +1,10 @@
 package pureneko.conveyor_belt_plus.util;
 
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.shape.VoxelShape;
-
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.function.Function;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 /** Lazily builds and caches one voxel shape per facing; shapes are shared by every block instance. */
 public final class DirectionalShapes {

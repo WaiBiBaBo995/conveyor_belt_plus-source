@@ -11,7 +11,7 @@ public final class BeltTiers {
     }
 
     public static int normalize(int tier) {
-        return net.minecraft.util.math.MathHelper.clamp(tier, STANDARD, ULTIMATE);
+        return net.minecraft.util.Mth.clamp(tier, STANDARD, ULTIMATE);
     }
 
     public static float speed(int tier) {

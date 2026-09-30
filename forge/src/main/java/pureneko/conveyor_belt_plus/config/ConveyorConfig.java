@@ -1,6 +1,8 @@
 package pureneko.conveyor_belt_plus.config;
 
 import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.common.ForgeConfigSpec.Builder;
+import net.minecraftforge.common.ForgeConfigSpec.DoubleValue;
 
 /** Native MinecraftForge SERVER configuration: persistence, validation, reload and sync belong to the loader. */
 public final class ConveyorConfig {
@@ -11,6 +13,8 @@ public final class ConveyorConfig {
     public static final ForgeConfigSpec.DoubleValue[] SPEEDS = new ForgeConfigSpec.DoubleValue[3];
     public static final ForgeConfigSpec.IntValue[] STACKS = new ForgeConfigSpec.IntValue[3];
     public static final ForgeConfigSpec.IntValue[] FILTER_LIMITS = new ForgeConfigSpec.IntValue[3];
+    public static final ForgeConfigSpec.IntValue[] FLUID_AMOUNTS = new ForgeConfigSpec.IntValue[3];
+    public static final ForgeConfigSpec.IntValue[] FLUID_FILTER_LIMITS = new ForgeConfigSpec.IntValue[3];
     public static final ForgeConfigSpec.IntValue SPLITTER_BUFFER;
     public static final ForgeConfigSpec.BooleanValue CHUTE_EXTRACTION_SIDES;
 
@@ -20,6 +24,12 @@ public final class ConveyorConfig {
         String[] chinese = {"普通", "高级", "终极"};
         int[] speed = {1, 2, 4}, stacks = {1, 4, 8}, filters = {5, 10, 15};
         for (int i = 0; i < names.length; i++) {
+            FLUID_AMOUNTS[i] = builder.comment(chinese[i] + "流体接口/通用接口每批抽取上限（mB）。", "Fluid and universal interface batch limit in mB.")
+                    .translation("config.conveyor_belt_plus.fluid_chute." + names[i] + ".millibuckets")
+                    .defineInRange("fluid_chute." + names[i] + ".millibuckets", new int[]{1000, 16000, 64000}[i], 1, 1_048_576);
+            FLUID_FILTER_LIMITS[i] = builder.comment(chinese[i] + "流体类型与流体标签规则数量；超出部分保留但不生效。", "Fluid type/tag rule limit; excess saved rules remain inactive.")
+                    .translation("config.conveyor_belt_plus.fluid_chute." + names[i] + ".filters")
+                    .defineInRange("fluid_chute." + names[i] + ".filters", filters[i], 1, MAX_FILTER_RULES);
             String speedKey = "belt." + names[i] + ".speed";
             String stacksKey = "chute." + names[i] + ".stacks";
             String filtersKey = "chute." + names[i] + ".filters";
@@ -51,13 +61,15 @@ public final class ConveyorConfig {
         return SPEC.isLoaded() ? entry.get() : entry.getDefault();
     }
     public static float beltSpeed(int tier) {
-        var entry = SPEEDS[net.minecraft.util.math.MathHelper.clamp(tier, 1, 3) - 1];
+        var entry = SPEEDS[net.minecraft.util.Mth.clamp(tier, 1, 3) - 1];
         double speed = value(entry);
         // MinecraftForge's numeric range correction leaves TOML nan unchanged; never feed it to transport math.
         return Double.isFinite(speed) ? (float) speed : entry.getDefault().floatValue();
     }
-    public static int chuteStacks(int tier) { return value(STACKS[net.minecraft.util.math.MathHelper.clamp(tier, 1, 3) - 1]); }
-    public static int chuteFilters(int tier) { return value(FILTER_LIMITS[net.minecraft.util.math.MathHelper.clamp(tier, 1, 3) - 1]); }
+    public static int chuteStacks(int tier) { return value(STACKS[net.minecraft.util.Mth.clamp(tier, 1, 3) - 1]); }
+    public static int chuteFilters(int tier) { return value(FILTER_LIMITS[net.minecraft.util.Mth.clamp(tier, 1, 3) - 1]); }
+    public static int fluidAmount(int tier) { return value(FLUID_AMOUNTS[net.minecraft.util.Mth.clamp(tier, 1, 3) - 1]); }
+    public static int fluidFilters(int tier) { return value(FLUID_FILTER_LIMITS[net.minecraft.util.Mth.clamp(tier, 1, 3) - 1]); }
     public static int splitterBufferItems() { return value(SPLITTER_BUFFER); }
     public static boolean extractionSidesEnabled() { return value(CHUTE_EXTRACTION_SIDES); }
 }

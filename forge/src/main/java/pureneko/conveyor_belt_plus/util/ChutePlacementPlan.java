@@ -1,16 +1,15 @@
 package pureneko.conveyor_belt_plus.util;
 
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.Nullable;
 import pureneko.conveyor_belt_plus.blocks.ChuteBlock;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.core.Direction;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.state.BlockState;
 
 /** Reserves exact inventory slots and chute variants before placing either endpoint. */
 public final class ChutePlacementPlan {
@@ -34,8 +33,8 @@ public final class ChutePlacementPlan {
     }
 
     /** Live stack references: offhand first, then hotbar 0..8 and main inventory 9..35. */
-    public static List<ItemStack> orderedInventory(PlayerEntity player) {
-        return orderedInventory(player.getInventory().main, player.getOffHandStack());
+    public static List<ItemStack> orderedInventory(Player player) {
+        return orderedInventory(player.getInventory().items, player.getOffhandItem());
     }
 
     public static List<ItemStack> orderedInventory(List<ItemStack> main, ItemStack offhand) {
@@ -69,13 +68,20 @@ public final class ChutePlacementPlan {
     }
 
     public BlockState state(int endpoint, Direction facing) {
-        return ((BlockItem) choices.get(endpoint).stack.getItem()).getBlock().getDefaultState()
-                .with(HorizontalFacingBlock.FACING, facing);
+        return ((BlockItem) choices.get(endpoint).stack.getItem()).getBlock().defaultBlockState()
+                .setValue(HorizontalDirectionalBlock.FACING, facing);
     }
 
     /** Also used for failure refunds, retaining the chosen tier and item components. */
     public ItemStack item(int endpoint) { return choices.get(endpoint).stack.copy(); }
     public int size() { return choices.size(); }
+
+    /** Restore the same live slot references, including an emptied offhand in a full inventory. */
+    public void refund(List<ItemStack> inventory) {
+        if (!consumed) return;
+        if (!creative) for (var choice : choices) inventory.get(choice.slot).grow(1);
+        consumed = false;
+    }
 
     /** Validate every reservation first, then consume exactly those slots, never a different tier. */
     public boolean consume(List<ItemStack> inventory) {
@@ -85,11 +91,11 @@ public final class ChutePlacementPlan {
             for (var choice : choices) {
                 if (choice.slot < 0 || choice.slot >= inventory.size()) return false;
                 var current = inventory.get(choice.slot);
-                if (!ItemStack.canCombine(current, choice.stack)
+                if (!ItemStack.isSameItemSameTags(current, choice.stack)
                         || ++needed[choice.slot] > current.getCount()) return false;
             }
             for (int slot = 0; slot < needed.length; slot++)
-                if (needed[slot] > 0) inventory.get(slot).decrement(needed[slot]);
+                if (needed[slot] > 0) inventory.get(slot).shrink(needed[slot]);
         }
         consumed = true;
         return true;

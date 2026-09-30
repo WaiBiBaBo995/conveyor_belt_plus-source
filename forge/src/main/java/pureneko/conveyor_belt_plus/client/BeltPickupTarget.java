@@ -1,57 +1,66 @@
 package pureneko.conveyor_belt_plus.client;
 
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import pureneko.conveyor_belt_plus.network.NetworkChannel;
 import pureneko.conveyor_belt_plus.blocks.BeltPickup;
 import pureneko.conveyor_belt_plus.blocks.ChuteBlockEntity;
+import pureneko.conveyor_belt_plus.compat.rts.RtsClient.View;
 import pureneko.conveyor_belt_plus.network.PickupNetworking;
+import pureneko.conveyor_belt_plus.util.BeltHitPath.Hit;
 
 /** Constant-memory nearest-hit accumulator fed by the existing item-render loop. */
 public final class BeltPickupTarget {
     private BeltPickupTarget() {}
-    private static ClientWorld frameWorld;
-    private static Vec3d eye, end;
+    private static ClientLevel frameWorld;
+    private static Vec3 eye, end;
     private static BlockPos owner;
     private static Direction port;
     private static long itemId, frameTime;
     private static float progress;
     private static double nearest, centerLimit;
-    private static Vec3d hit;
+    private static Vec3 hit;
     private static int lastRequest = Integer.MIN_VALUE;
     private static boolean remote;
-    private static net.minecraft.item.ItemStack shownStack = net.minecraft.item.ItemStack.EMPTY;
+    private static BlockPos insertionOwner;
+    private static Direction insertionPort;
+    private static Vec3 insertionHit;
+    private static double insertionDistance;
+    private static net.minecraft.world.item.ItemStack heldForInsertion = net.minecraft.world.item.ItemStack.EMPTY;
+    private static net.minecraft.world.item.ItemStack shownStack = net.minecraft.world.item.ItemStack.EMPTY;
     private static int shownTier;
-    public record Target(BlockPos owner, Direction port, long id, float progress, Vec3d hit,
-                         net.minecraft.item.ItemStack stack, int tier) {}
+    public record Target(BlockPos owner, Direction port, long id, float progress, Vec3 hit,
+                         net.minecraft.world.item.ItemStack stack, int tier) {}
 
     public static Target current() {
-        return owner == null || MinecraftClient.getInstance().world != frameWorld || System.nanoTime() - frameTime > 250_000_000L ? null
+        return owner == null || Minecraft.getInstance().level != frameWorld || System.nanoTime() - frameTime > 250_000_000L ? null
                 : new Target(owner, port, itemId, progress, hit, shownStack.copy(), shownTier);
     }
 
     public static void clear() {
         frameWorld = null;
         owner = null;
-        shownStack = net.minecraft.item.ItemStack.EMPTY;
+        insertionOwner = null;
+        shownStack = net.minecraft.world.item.ItemStack.EMPTY;
         eye = end = hit = null;
         lastRequest = Integer.MIN_VALUE;
     }
 
     public static void beginFrame(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_SKY) return;
-        var client = MinecraftClient.getInstance();
-        if (frameWorld != client.world) lastRequest = Integer.MIN_VALUE;
-        frameWorld = client.world;
+        var client = Minecraft.getInstance();
+        if (frameWorld != client.level) lastRequest = Integer.MIN_VALUE;
+        frameWorld = client.level;
         owner = null;
+        insertionOwner = null;
         eye = null;
         remote = false;
         frameTime = System.nanoTime();
@@ -60,24 +69,27 @@ public final class BeltPickupTarget {
             var view = pureneko.conveyor_belt_plus.compat.rts.RtsClient.view();
             if (view != null) {
                 remote = true;
+                heldForInsertion = view.stack();
                 eye = view.origin();
-                end = eye.add(view.direction().multiply(128));
-                nearest = eye.squaredDistanceTo(end);
+                end = eye.add(view.direction().scale(128));
+                nearest = eye.distanceToSqr(end);
                 if (view.hit() != null && view.hit().getType() != HitResult.Type.MISS)
-                    nearest = Math.min(nearest, eye.squaredDistanceTo(view.hit().getPos()));
+                    nearest = Math.min(nearest, eye.distanceToSqr(view.hit().getLocation()));
+                insertionDistance = nearest;
                 updateCenterLimit();
                 return;
             }
         }
-        if (client.currentScreen != null || client.getCameraEntity() != client.player
-                || !client.player.getMainHandStack().isEmpty() && !net.minecraftforge.fml.ModList.get().isLoaded("jade")) return;
+        if (client.screen != null || client.getCameraEntity() != client.player) return;
+        heldForInsertion = client.player.getMainHandItem();
         float delta = event.getPartialTick();
-        eye = client.player.getCameraPosVec(delta);
-        end = eye.add(client.player.getRotationVec(delta).multiply(client.player.getBlockReach()));
-        nearest = eye.squaredDistanceTo(end);
+        eye = client.player.getEyePosition(delta);
+        end = eye.add(client.player.getViewVector(delta).scale(client.player.getBlockReach()));
+        nearest = eye.distanceToSqr(end);
         // A vanilla entity/block in front keeps priority. The server raycasts again on the click.
-        if (client.crosshairTarget != null && client.crosshairTarget.getType() != HitResult.Type.MISS)
-            nearest = Math.min(nearest, eye.squaredDistanceTo(client.crosshairTarget.getPos()));
+        if (client.hitResult != null && client.hitResult.getType() != HitResult.Type.MISS)
+            nearest = Math.min(nearest, eye.distanceToSqr(client.hitResult.getLocation()));
+        insertionDistance = nearest;
         updateCenterLimit();
     }
 
@@ -88,15 +100,15 @@ public final class BeltPickupTarget {
     }
 
     public static void consider(BlockEntity entity, Direction output, ChuteBlockEntity.BeltItem packet,
-                                float shown, Vec3d point) {
-        if (eye == null || entity.getWorld() != frameWorld || point.squaredDistanceTo(eye) > centerLimit) return;
+                                float shown, Vec3 point) {
+        if (eye == null || entity.getLevel() != frameWorld || point.distanceToSqr(eye) > centerLimit) return;
         var intersection = BeltPickup.rayHit(BeltPickup.bounds(point), eye, end);
         if (intersection == null) return;
-        double distance = intersection.squaredDistanceTo(eye);
+        double distance = intersection.distanceToSqr(eye);
         if (distance >= nearest) return;
         nearest = distance;
         updateCenterLimit();
-        owner = entity.getPos();
+        owner = entity.getBlockPos();
         port = output;
         itemId = packet.id;
         progress = shown;
@@ -105,29 +117,61 @@ public final class BeltPickupTarget {
         shownTier = entity instanceof pureneko.conveyor_belt_plus.blocks.ConveyorNode node ? node.outgoingBeltTier(output) : 1;
     }
 
-    public static void interact(InputEvent.InteractionKeyMappingTriggered event) {
-        var client = MinecraftClient.getInstance();
-        if (!event.isUseItem() || owner == null || client.world != frameWorld || client.player == null
-                || client.currentScreen != null || client.player.isSpectator()
-                || !client.player.getMainHandStack().isEmpty() || System.nanoTime() - frameTime > 250_000_000L) return;
-        if (!BeltPickup.unobstructed(client.player, eye, hit)) return;
-        // MinecraftForge fires both hands even after cancellation: consume both, send only once.
-        event.setCanceled(true);
-        event.setSwingHand(event.getHand() == Hand.MAIN_HAND);
-        if (event.getHand() != Hand.MAIN_HAND || lastRequest == client.player.age) return;
-        lastRequest = client.player.age;
-        NetworkChannel.sendToServer(new PickupNetworking.Request(owner, port, itemId, progress));
+    public static void considerRoute(BlockEntity entity, Direction port, ChuteBlockEntity.BeltData data) {
+        if (eye == null || entity.getLevel() != frameWorld
+                || !pureneko.conveyor_belt_plus.blocks.BeltInsertion.validStack(heldForInsertion)) return;
+        var target = data.interactionPath().raycast(eye, end);
+        if (target == null || eye.distanceToSqr(target.point()) >= insertionDistance) return;
+        insertionDistance = eye.distanceToSqr(target.point());
+        insertionOwner = entity.getBlockPos();
+        insertionPort = port;
+        insertionHit = target.point();
     }
 
-    public static boolean takeRemote(Vec3d origin, Vec3d direction) {
-        var client = MinecraftClient.getInstance();
-        if (!remote || current() == null || client.world != frameWorld || client.player == null
-                || client.player.isSpectator() || lastRequest == client.player.age
-                || origin.squaredDistanceTo(eye) > .01 || direction.dotProduct(end.subtract(eye).normalize()) < .9999
+    public static void interact(InputEvent.InteractionKeyMappingTriggered event) {
+        var client = Minecraft.getInstance();
+        if (!event.isUseItem() || client.level != frameWorld || client.player == null || remote
+                || client.screen != null || client.player.isSpectator()
+                || System.nanoTime() - frameTime > 250_000_000L) return;
+        boolean taking = owner != null && canTake(shownStack, client.player.getMainHandItem());
+        if (!taking && (insertionOwner == null || !pureneko.conveyor_belt_plus.blocks.BeltInsertion.validStack(client.player.getMainHandItem()))) return;
+        if (!BeltPickup.unobstructed(client.player, eye, taking ? hit : insertionHit)) return;
+        event.setCanceled(true);
+        event.setSwingHand(event.getHand() == InteractionHand.MAIN_HAND);
+        if (event.getHand() != InteractionHand.MAIN_HAND || lastRequest == client.player.tickCount) return;
+        lastRequest = client.player.tickCount;
+        if (taking) NetworkChannel.sendToServer(new PickupNetworking.Request(owner, port, itemId, progress));
+        else NetworkChannel.sendToServer(new pureneko.conveyor_belt_plus.network.InsertionNetworking.Put(insertionOwner, insertionPort));
+    }
+
+    public static boolean putRemote(Vec3 origin, Vec3 direction, net.minecraft.world.item.ItemStack selected) {
+        var client = Minecraft.getInstance();
+        if (!remote || insertionOwner == null || client.level != frameWorld || client.player == null
+                || client.player.isSpectator() || !pureneko.conveyor_belt_plus.blocks.BeltInsertion.validStack(selected)
+                || lastRequest == client.player.tickCount || System.nanoTime() - frameTime > 250_000_000L
+                || origin.distanceToSqr(eye) > .01 || direction.dot(end.subtract(eye).normalize()) < .9999
+                || !BeltPickup.unobstructed(client.player, origin, insertionHit)) return false;
+        lastRequest = client.player.tickCount;
+        NetworkChannel.sendToServer(new pureneko.conveyor_belt_plus.network.InsertionNetworking.RemotePut(
+                insertionOwner, insertionPort, origin, direction, selected.copyWithCount(1)));
+        return true;
+    }
+
+    public static boolean canTake(net.minecraft.world.item.ItemStack packet, net.minecraft.world.item.ItemStack held) {
+        return !pureneko.conveyor_belt_plus.util.FluidPackets.isPacket(held) && (pureneko.conveyor_belt_plus.util.FluidPackets.isPacket(packet)
+                ? net.minecraftforge.fluids.FluidUtil.getFluidHandler(held).isPresent() : held.isEmpty());
+    }
+
+    public static boolean takeRemote(Vec3 origin, Vec3 direction) { return takeRemote(origin, direction, net.minecraft.world.item.ItemStack.EMPTY); }
+    public static boolean takeRemote(Vec3 origin, Vec3 direction, net.minecraft.world.item.ItemStack selected) {
+        var client = Minecraft.getInstance();
+        if (!remote || current() == null || client.level != frameWorld || client.player == null
+                || client.player.isSpectator() || !canTake(shownStack, selected) || lastRequest == client.player.tickCount
+                || origin.distanceToSqr(eye) > .01 || direction.dot(end.subtract(eye).normalize()) < .9999
                 || !BeltPickup.unobstructed(client.player, origin, hit)) return false;
-        lastRequest = client.player.age;
+        lastRequest = client.player.tickCount;
         NetworkChannel.sendToServer(new pureneko.conveyor_belt_plus.network.RtsNetworking.Take(
-                owner, port, itemId, progress, origin, direction));
+                owner, port, itemId, progress, origin, direction, selected.isEmpty() ? "" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(selected.getItem()).toString()));
         return true;
     }
 }

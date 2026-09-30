@@ -1,13 +1,24 @@
 package pureneko.conveyor_belt_plus;
 
+import pureneko.conveyor_belt_plus.compat.rts.RtsUiViewport;
 import pureneko.conveyor_belt_plus.config.ConveyorConfig;
 import pureneko.conveyor_belt_plus.util.BeltTiers;
 import pureneko.conveyor_belt_plus.util.BeltTransport;
+import pureneko.conveyor_belt_plus.util.BeltVisualState;
+import pureneko.conveyor_belt_plus.util.ExtractionSide;
 import pureneko.conveyor_belt_plus.util.ProgressAnimation;
-
+import pureneko.conveyor_belt_plus.util.RedstoneControl;
+import pureneko.conveyor_belt_plus.util.RedstoneControl.Mode;
+import pureneko.conveyor_belt_plus.util.SplitDistribution.Result;
+import com.electronwill.nightconfig.core.CommentedConfig;
+import java.io.StringWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Random;
+import net.minecraft.core.Direction;
 
 /** No client, running world or additional test framework required. */
 public final class ConveyorRegressionTests {
@@ -49,9 +60,9 @@ public final class ConveyorRegressionTests {
 
     private static void extractionSides() {
         var faces = pureneko.conveyor_belt_plus.util.ExtractionSide.values();
-        for (var front : new net.minecraft.util.math.Direction[]{net.minecraft.util.math.Direction.NORTH,
-                net.minecraft.util.math.Direction.SOUTH, net.minecraft.util.math.Direction.EAST, net.minecraft.util.math.Direction.WEST}) {
-            var directions = java.util.EnumSet.noneOf(net.minecraft.util.math.Direction.class);
+        for (var front : new net.minecraft.core.Direction[]{net.minecraft.core.Direction.NORTH,
+                net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.WEST}) {
+            var directions = java.util.EnumSet.noneOf(net.minecraft.core.Direction.class);
             var cells = new java.util.HashSet<String>();
             for (var face : faces) {
                 check(directions.add(face.direction(front)), "each selector maps to a unique face");

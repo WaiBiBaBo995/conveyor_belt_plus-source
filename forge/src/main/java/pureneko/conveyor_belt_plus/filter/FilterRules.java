@@ -1,14 +1,13 @@
 package pureneko.conveyor_belt_plus.filter;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.registry.RegistryWrapper;
 import pureneko.conveyor_belt_plus.registry.ConveyorBeltPlus;
 import pureneko.conveyor_belt_plus.config.ConveyorConfig;
 
 import java.util.Arrays;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.item.ItemStack;
 
 /** Keeps out-of-limit rules dormant when a server lowers the configured capacity. */
 public final class FilterRules {
@@ -34,8 +33,8 @@ public final class FilterRules {
         return count;
     }
 
-    public void write(NbtCompound nbt, net.minecraft.registry.DynamicRegistryManager lookup) {
-        var list = new NbtList();
+    public void write(CompoundTag nbt, net.minecraft.core.RegistryAccess lookup) {
+        var list = new ListTag();
         for (int i = 0; i < rules.length; i++) {
             if (rules[i].isEmpty()) continue;
             var tag = rules[i].write(lookup);
@@ -45,11 +44,11 @@ public final class FilterRules {
         nbt.put("filterRules", list);
     }
 
-    public void read(NbtCompound nbt, net.minecraft.registry.DynamicRegistryManager lookup) {
+    public void read(CompoundTag nbt, net.minecraft.core.RegistryAccess lookup) {
         Arrays.fill(rules, FilterRule.EMPTY);
-        if (nbt.contains("filterRules", NbtElement.LIST_TYPE)) {
-            for (var element : nbt.getList("filterRules", NbtElement.COMPOUND_TYPE)) {
-                var tag = (NbtCompound) element;
+        if (nbt.contains("filterRules", Tag.TAG_LIST)) {
+            for (var element : nbt.getList("filterRules", Tag.TAG_COMPOUND)) {
+                var tag = (CompoundTag) element;
                 int slot = tag.getInt("slot");
                 if (slot < 0 || slot >= rules.length) continue;
                 try { rules[slot] = FilterRule.read(tag, lookup); }
@@ -57,11 +56,11 @@ public final class FilterRules {
             }
         } else {
             // Older markers used exact component matching. Keep that behavior when reading old NBT.
-            var list = nbt.getList("filters", NbtElement.COMPOUND_TYPE);
+            var list = nbt.getList("filters", Tag.TAG_COMPOUND);
             for (int i = 0; i < Math.min(list.size(), rules.length); i++)
-                rules[i] = FilterRule.item(ItemStack.fromNbt(list.getCompound(i)), true);
-            if (list.isEmpty() && nbt.contains("filter", NbtElement.COMPOUND_TYPE))
-                rules[0] = FilterRule.item(ItemStack.fromNbt(nbt.getCompound("filter")), true);
+                rules[i] = FilterRule.item(ItemStack.of(list.getCompound(i)), true);
+            if (list.isEmpty() && nbt.contains("filter", Tag.TAG_COMPOUND))
+                rules[0] = FilterRule.item(ItemStack.of(nbt.getCompound("filter")), true);
         }
     }
 }

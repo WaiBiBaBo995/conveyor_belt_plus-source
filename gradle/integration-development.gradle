@@ -11,7 +11,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 // RTS 1.1.8-beta and Jade 11.13.3 ship remap=false selectors/aliases with SRG names.
-// They work in production Forge but cannot match Yarn development method names.
+// They work in production Forge but cannot match Mojang development method names.
 // Adapt only annotation selectors in a build-local copy of Loom's remapped JAR.
 // Never change dependency caches, implementation bytecode, or the release mod.
 def developmentJars = [:]

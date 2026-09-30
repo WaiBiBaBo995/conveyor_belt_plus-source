@@ -1,9 +1,10 @@
 package pureneko.conveyor_belt_plus.forge;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
@@ -13,8 +14,8 @@ import org.jetbrains.annotations.Nullable;
 public final class ConveyorItemApi {
     private ConveyorItemApi() {}
 
-    public static @Nullable InventoryStorage find(World world, BlockPos pos, Direction direction) {
-        if (!world.isChunkLoaded(pos)) return null;
+    public static @Nullable InventoryStorage find(Level world, BlockPos pos, Direction direction) {
+        if (!world.hasChunkAt(pos)) return null;
         var entity = world.getBlockEntity(pos);
         var handler = entity == null ? null : entity.getCapability(ForgeCapabilities.ITEM_HANDLER, direction).orElse(null);
         return handler == null ? null : new InventoryStorage(handler);
@@ -37,7 +38,7 @@ public final class ConveyorItemApi {
             int total = 0;
             for (int slot = 0; slot < container.getSlots() && total < extracted.getCount(); slot++) {
                 var available = container.getStackInSlot(slot);
-                if (ItemStack.canCombine(available, extracted)) {
+                if (ItemStack.isSameItemSameTags(available, extracted)) {
                     total += container.extractItem(slot, extracted.getCount() - total, false).getCount();
                 }
             }

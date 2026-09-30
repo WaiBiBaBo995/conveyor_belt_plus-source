@@ -1,9 +1,9 @@
 package pureneko.conveyor_belt_plus.compat;
 
 import pureneko.conveyor_belt_plus.registry.ConveyorBeltPlus;
-import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 import java.lang.reflect.Method;
+import net.minecraft.world.item.ItemStack;
 
 /** Optional integration; no FTB or Architectury classes are linked by this mod. */
 public final class FtbFilters {

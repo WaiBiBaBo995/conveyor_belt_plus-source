@@ -1,37 +1,40 @@
 package pureneko.conveyor_belt_plus.items;
 
 import pureneko.conveyor_belt_plus.blocks.ChuteBlock;
-import net.minecraft.block.Block;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.client.item.TooltipContext;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import java.util.List;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 
 public class TooltipBlockItem extends BlockItem {
-    public TooltipBlockItem(Block block, Settings settings) { super(block, settings); }
-    @Override public net.minecraft.util.ActionResult useOnBlock(net.minecraft.item.ItemUsageContext context) {
+    public TooltipBlockItem(Block block, Properties settings) { super(block, settings); }
+    @Override public net.minecraft.world.InteractionResult useOn(net.minecraft.world.item.context.UseOnContext context) {
         var player = context.getPlayer();
-        var world = context.getWorld();
-        if (player != null && player.isSneaking() && getBlock() instanceof ChuteBlock upgrade
-                && world.getBlockState(context.getBlockPos()).getBlock() instanceof ChuteBlock previous
+        var world = context.getLevel();
+        if (player != null && player.isShiftKeyDown() && getBlock() instanceof ChuteBlock upgrade
+                && world.getBlockState(context.getClickedPos()).getBlock() instanceof ChuteBlock previous
+                && previous.getKind() == upgrade.getKind()
                 && pureneko.conveyor_belt_plus.util.TierUpgrade.isUpgrade(previous.getTier(), upgrade.getTier())) {
-            if (world.isClient) return net.minecraft.util.ActionResult.SUCCESS;
-            return pureneko.conveyor_belt_plus.blocks.UpgradeInteractions.chute(world, context.getBlockPos(),
-                    player, context.getStack(), upgrade) ? net.minecraft.util.ActionResult.SUCCESS : net.minecraft.util.ActionResult.FAIL;
+            if (world.isClientSide) return net.minecraft.world.InteractionResult.SUCCESS;
+            return pureneko.conveyor_belt_plus.blocks.UpgradeInteractions.chute(world, context.getClickedPos(),
+                    player, context.getItemInHand(), upgrade) ? net.minecraft.world.InteractionResult.SUCCESS : net.minecraft.world.InteractionResult.FAIL;
         }
-        return super.useOnBlock(context);
+        return super.useOn(context);
     }
-    @Override public void appendTooltip(ItemStack stack, net.minecraft.world.World context, List<Text> tooltip, TooltipContext type) {
+    @Override public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level context, List<Component> tooltip, TooltipFlag type) {
         if (!(getBlock() instanceof ChuteBlock))
-            tooltip.add(Text.translatable(getBlock().getTranslationKey() + ".tooltip").formatted(Formatting.GRAY));
-        super.appendTooltip(stack, context, tooltip, type);
+            tooltip.add(Component.translatable(getBlock().getDescriptionId() + ".tooltip").withStyle(ChatFormatting.GRAY));
+        super.appendHoverText(stack, context, tooltip, type);
         if (getBlock() instanceof pureneko.conveyor_belt_plus.blocks.ConveyorSplitterBlock)
-            tooltip.add(Text.translatable("tooltip.conveyor_belt_plus.splitter.capacity",
-                    pureneko.conveyor_belt_plus.config.ConveyorConfig.splitterBufferItems()).formatted(Formatting.AQUA));
+            tooltip.add(Component.translatable("tooltip.conveyor_belt_plus.splitter.capacity",
+                    pureneko.conveyor_belt_plus.config.ConveyorConfig.splitterBufferItems()).withStyle(ChatFormatting.AQUA));
         if (!Screen.hasControlDown() && getBlock() instanceof ChuteBlock)
-            tooltip.add(Text.translatable("message.conveyor_belt_plus.show_extra").formatted(Formatting.DARK_GRAY));
+            tooltip.add(Component.translatable("message.conveyor_belt_plus.show_extra").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

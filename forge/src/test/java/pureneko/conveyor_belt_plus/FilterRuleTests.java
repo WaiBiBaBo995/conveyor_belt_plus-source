@@ -1,59 +1,61 @@
 package pureneko.conveyor_belt_plus;
 
 import io.netty.buffer.Unpooled;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
 import pureneko.conveyor_belt_plus.filter.FilterRule;
 import pureneko.conveyor_belt_plus.filter.FilterRules;
 import pureneko.conveyor_belt_plus.network.FilterNetworking;
-
+import pureneko.conveyor_belt_plus.network.FilterNetworking.Edit;
+import pureneko.conveyor_belt_plus.network.FilterNetworking.Snapshot;
 import java.util.List;
+import java.util.Map;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.RegistryAccess.Frozen;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 public final class FilterRuleTests {
     private static int checks;
-    public static void run(net.minecraft.registry.DynamicRegistryManager lookup) {
+    public static void run(net.minecraft.core.RegistryAccess lookup) {
         matchingAndEditing(lookup);
         capacitiesAndPersistence(lookup);
         networking(lookup);
         System.out.println("Conveyor Belt Plus: " + checks + " filter and packet checks passed.");
     }
 
-    private static void matchingAndEditing(net.minecraft.registry.DynamicRegistryManager lookup) {
+    private static void matchingAndEditing(net.minecraft.core.RegistryAccess lookup) {
         var sword = new ItemStack(Items.DIAMOND_SWORD);
-        sword.setDamage(3);
-        sword.setCustomName(Text.literal("Priority"));
+        sword.setDamageValue(3);
+        sword.setHoverName(Component.literal("Priority"));
         var differentlyDamaged = sword.copy();
-        differentlyDamaged.setDamage(7);
+        differentlyDamaged.setDamageValue(7);
         var item = FilterRule.item(sword, false);
         var exact = FilterRule.item(sword, true);
         check(item.matches(differentlyDamaged), "item rule ignores components");
         check(exact.matches(sword) && !exact.matches(differentlyDamaged), "component rule compares exact damage");
         check(!item.matches(new ItemStack(Items.IRON_SWORD)), "item type must match");
         var renamed = sword.copy();
-        renamed.setCustomName(Text.literal("Other"));
+        renamed.setHoverName(Component.literal("Other"));
         check(!exact.matches(renamed), "component rule compares exact names");
         check(exact.matches(sword.copyWithCount(32)), "count is not a component predicate");
         var exported = exact.prototype();
-        exported.setDamage(99);
+        exported.setDamageValue(99);
         check(exact.matches(sword), "marker access cannot mutate stored rule");
         String initial = FilterRule.componentsText(sword, lookup);
         check(FilterRule.editComponents(sword, initial, lookup).matches(sword), "editable component text round trip");
         var edited = FilterRule.editComponents(sword, "{Damage:7}", lookup);
-        check(edited.kind() == FilterRule.Kind.COMPONENTS && edited.prototype().getDamage() == 7,
+        check(edited.kind() == FilterRule.Kind.COMPONENTS && edited.prototype().getDamageValue() == 7,
                 "edited damage becomes exact filter");
-        check(!edited.prototype().hasCustomName(), "omitted patch keys return to default components");
-        check(sword.getDamage() == 3 && sword.getName().getString().equals("Priority"), "editing never modifies real source item");
+        check(!edited.prototype().hasCustomHoverName(), "omitted patch keys return to default components");
+        check(sword.getDamageValue() == 3 && sword.getHoverName().getString().equals("Priority"), "editing never modifies real source item");
         check(FilterRule.editComponents(sword, "{Damage:3,display:{Name:'{\"text\":\"Priority\"}'}}", lookup)
                 .matches(sword), "manual NBT preserves the exact serialized name");
         var potion = new ItemStack(Items.POTION);
@@ -65,7 +67,7 @@ public final class FilterRuleTests {
         var sharpness4 = FilterRule.editComponents(sword, "{Enchantments:[{id:\"minecraft:sharpness\",lvl:4s}]}", lookup);
         check(!sharpness3.matches(sharpness4.prototype()) && sharpness3.matches(sharpness3.prototype()), "exact enchantment levels");
         check(FilterRule.fromText(sharpness3.toText(lookup), lookup).sameRule(sharpness3), "dynamic-registry enchantment round-trip");
-        check(FilterRule.editComponents(sword, "{CustomModData:{value:4}}", lookup).prototype().getSubNbt("CustomModData").getInt("value") == 4, "mod-defined NBT is preserved");
+        check(FilterRule.editComponents(sword, "{CustomModData:{value:4}}", lookup).prototype().getTagElement("CustomModData").getInt("value") == 4, "mod-defined NBT is preserved");
         rejects(() -> FilterRule.editComponents(sword, "{Damage:\"not_a_number\"}", lookup), "invalid damage tag rejected");
         rejects(() -> FilterRule.editComponents(sword, "{broken", lookup), "malformed SNBT rejected");
         rejects(() -> FilterRule.editComponents(sword, " ".repeat(FilterRule.MAX_COMPONENT_TEXT + 1), lookup), "oversized edit rejected");
@@ -74,17 +76,17 @@ public final class FilterRuleTests {
         rejects(() -> FilterRule.tag("missing_namespace"), "tag namespace is mandatory");
         rejects(() -> FilterRule.tag("minecraft:INVALID"), "invalid tag syntax rejected");
 
-        var tagKey = TagKey.of(RegistryKeys.ITEM, new Identifier("conveyor_belt_plus_test", "logs"));
-        var allTags = Registries.ITEM.streamTagsAndEntries().collect(java.util.stream.Collectors.toMap(
+        var tagKey = TagKey.create(Registries.ITEM, new ResourceLocation("conveyor_belt_plus_test", "logs"));
+        var allTags = BuiltInRegistries.ITEM.getTags().collect(java.util.stream.Collectors.toMap(
                 com.mojang.datafixers.util.Pair::getFirst, pair -> pair.getSecond().stream().toList()));
-        allTags.put(tagKey, List.<RegistryEntry<net.minecraft.item.Item>>of(Items.OAK_LOG.getRegistryEntry(), Items.BIRCH_LOG.getRegistryEntry()));
-        Registries.ITEM.populateTags(allTags);
+        allTags.put(tagKey, List.<Holder<net.minecraft.world.item.Item>>of(Items.OAK_LOG.builtInRegistryHolder(), Items.BIRCH_LOG.builtInRegistryHolder()));
+        BuiltInRegistries.ITEM.bindTags(allTags);
         var tag = FilterRule.tag("#conveyor_belt_plus_test:logs");
         check(tag.matches(new ItemStack(Items.OAK_LOG)) && tag.matches(new ItemStack(Items.BIRCH_LOG))
                 && !tag.matches(new ItemStack(Items.STONE)), "tag matches all member item types");
-        check(tag.icon().isOf(Items.OAK_LOG), "tag has representative icon");
-        allTags.put(tagKey, List.<RegistryEntry<net.minecraft.item.Item>>of(Items.SPRUCE_LOG.getRegistryEntry()));
-        Registries.ITEM.populateTags(allTags);
+        check(tag.icon().is(Items.OAK_LOG), "tag has representative icon");
+        allTags.put(tagKey, List.<Holder<net.minecraft.world.item.Item>>of(Items.SPRUCE_LOG.builtInRegistryHolder()));
+        BuiltInRegistries.ITEM.bindTags(allTags);
         check(!tag.matches(new ItemStack(Items.OAK_LOG)) && tag.matches(new ItemStack(Items.SPRUCE_LOG)),
                 "existing rule follows tag reload, not a frozen list of items");
         check(!FilterRule.tag("missing:valid_tag").matches(new ItemStack(Items.OAK_LOG)), "unknown tag matches nothing");
@@ -95,7 +97,7 @@ public final class FilterRuleTests {
         check(!FilterRule.EMPTY.matches(sword), "empty rule never matches");
     }
 
-    private static void capacitiesAndPersistence(net.minecraft.registry.DynamicRegistryManager lookup) {
+    private static void capacitiesAndPersistence(net.minecraft.core.RegistryAccess lookup) {
         var rules = new FilterRules();
         var iron = new ItemStack(Items.IRON_INGOT);
         check(rules.allows(iron, 5, false) && !rules.allows(iron, 5, true), "empty blacklist allows; empty whitelist blocks");
@@ -110,16 +112,16 @@ public final class FilterRuleTests {
         check(rules.set(53, 54, FilterRule.item(new ItemStack(Items.DIAMOND), false)), "configured multi-page limit accepted");
         check(!rules.set(54, 55, FilterRule.item(iron, false)), "hard storage ceiling enforced");
         check(!rules.allows(new ItemStack(Items.DIAMOND), 15, true), "out-of-limit rules are dormant");
-        var nbt = new NbtCompound();
+        var nbt = new CompoundTag();
         rules.write(nbt, lookup);
         var restored = new FilterRules();
         restored.read(nbt, lookup);
         check(restored.get(53).sameRule(rules.get(53)) && restored.allows(new ItemStack(Items.DIAMOND), 54, true),
                 "lowering capacity never deletes dormant rules");
         check(restored.get(7).sameRule(rules.get(7)) && restored.get(14).sameRule(rules.get(14)), "all rule kinds persist");
-        var legacy = new NbtCompound();
-        var list = new NbtList();
-        for (int i = 0; i < 18; i++) list.add(new ItemStack(Items.IRON_INGOT).writeNbt(new NbtCompound()));
+        var legacy = new CompoundTag();
+        var list = new ListTag();
+        for (int i = 0; i < 18; i++) list.add(new ItemStack(Items.IRON_INGOT).save(new CompoundTag()));
         legacy.put("filters", list);
         restored.read(legacy, lookup);
         check(restored.get(17).kind() == FilterRule.Kind.COMPONENTS, "legacy eighteenth marker retained with exact semantics");
@@ -127,10 +129,10 @@ public final class FilterRuleTests {
         check(restored.set(0, 15, FilterRule.EMPTY) && restored.used(15) == 14, "clearing frees a rule slot");
     }
 
-    private static void networking(net.minecraft.registry.DynamicRegistryManager lookup) {
+    private static void networking(net.minecraft.core.RegistryAccess lookup) {
         var raw = FilterRule.item(new ItemStack(Items.DIAMOND), true).toText(lookup);
-        var registry = DynamicRegistryManager.of(Registries.REGISTRIES);
-        var buf = new PacketByteBuf(Unpooled.buffer());
+        var registry = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+        var buf = new FriendlyByteBuf(Unpooled.buffer());
         try {
             var edit = new FilterNetworking.Edit(7, 14, raw);
             FilterNetworking.Edit.CODEC.encode(buf, edit);
@@ -141,7 +143,8 @@ public final class FilterRuleTests {
             check(FilterNetworking.Snapshot.CODEC.decode(buf).equals(state), "maximum-capacity snapshot round-trip");
             buf.clear();
             buf.writeVarInt(1);
-            buf.writeBoolean(false);
+            buf.writeBoolean(false); // item tab
+            buf.writeBoolean(false); // blacklist
             buf.writeVarInt(55);
             rejects(() -> FilterNetworking.Snapshot.CODEC.decode(buf), "oversized rule array rejected before allocation");
         } finally { buf.release(); }

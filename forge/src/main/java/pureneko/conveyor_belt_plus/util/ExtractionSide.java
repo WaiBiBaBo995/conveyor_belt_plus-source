@@ -1,6 +1,6 @@
 package pureneko.conveyor_belt_plus.util;
 
-import net.minecraft.util.math.Direction;
+import net.minecraft.core.Direction;
 
 /** Stable saved bit positions. Front is the attached container face carrying this chute. */
 public enum ExtractionSide {
@@ -22,8 +22,8 @@ public enum ExtractionSide {
             case FRONT -> front;
             case BACK -> front.getOpposite();
             // Left/right as seen by a player outside the front, looking into the container.
-            case LEFT -> front.rotateYClockwise();
-            case RIGHT -> front.rotateYCounterclockwise();
+            case LEFT -> front.getClockWise();
+            case RIGHT -> front.getCounterClockWise();
             case TOP -> Direction.UP;
             case BOTTOM -> Direction.DOWN;
         };

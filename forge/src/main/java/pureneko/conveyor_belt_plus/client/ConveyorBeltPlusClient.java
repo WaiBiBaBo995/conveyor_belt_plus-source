@@ -7,9 +7,10 @@ import pureneko.conveyor_belt_plus.registry.ScreenContent;
 import pureneko.conveyor_belt_plus.client.renderers.*;
 import pureneko.conveyor_belt_plus.client.screens.ChuteScreen;
 import pureneko.conveyor_belt_plus.util.BeltRenderClock;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderLayers;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.world.level.block.Block;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
@@ -36,29 +37,33 @@ public final class ConveyorBeltPlusClient {
     }
     private static void tick(net.minecraftforge.event.TickEvent.ClientTickEvent event) {
         if (event.phase != net.minecraftforge.event.TickEvent.Phase.START) return;
-        var client = MinecraftClient.getInstance();
-        BeltRenderClock.advance(client.world, client.isPaused());
+        var client = Minecraft.getInstance();
+        BeltRenderClock.advance(client.level, client.isPaused());
         if (net.minecraftforge.fml.ModList.get().isLoaded("rtsbuilding"))
             pureneko.conveyor_belt_plus.compat.rts.RtsClient.tick();
-        if (client.world == null) {
+        if (client.level == null) {
             BeltPickupTarget.clear();
             ChuteBeltRenderer.clearLightingCache();
         }
     }
     private static void outline(RenderHighlightEvent.Block event) {
-        if (MinecraftClient.getInstance().currentScreen != null) return;
-        BeltOutlineRenderer.renderPlannedBelt(MinecraftClient.getInstance().world, event.getCamera(),
+        if (Minecraft.getInstance().screen != null) return;
+        BeltOutlineRenderer.renderPlannedBelt(Minecraft.getInstance().level, event.getCamera(),
                 event.getPoseStack(), event.getMultiBufferSource());
     }
     private static void registerScreens(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) {
-        event.enqueueWork(() -> net.minecraft.client.gui.screen.ingame.HandledScreens.register(ScreenContent.CHUTE.get(), ChuteScreen::new));
+        event.enqueueWork(() -> net.minecraft.client.gui.screens.MenuScreens.register(ScreenContent.CHUTE.get(), ChuteScreen::new));
     }
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(BlockEntitiesContent.CHUTE_BLOCK.get(), ctx -> new ChuteBeltRenderer());
         event.registerBlockEntityRenderer(BlockEntitiesContent.SPLITTER.get(), ctx -> new SplitterBeltRenderer());
-        RenderLayers.setRenderLayer(BlockContent.CHUTE_BLOCK.get(), RenderLayer.getTranslucent());
-        RenderLayers.setRenderLayer(BlockContent.ADVANCED_CHUTE.get(), RenderLayer.getTranslucent());
-        RenderLayers.setRenderLayer(BlockContent.ULTIMATE_CHUTE.get(), RenderLayer.getTranslucent());
-        RenderLayers.setRenderLayer(BlockContent.SPLITTER.get(), RenderLayer.getTranslucent());
+        ItemBlockRenderTypes.setRenderLayer(BlockContent.CHUTE_BLOCK.get(), RenderType.translucent());
+        ItemBlockRenderTypes.setRenderLayer(BlockContent.ADVANCED_CHUTE.get(), RenderType.translucent());
+        ItemBlockRenderTypes.setRenderLayer(BlockContent.ULTIMATE_CHUTE.get(), RenderType.translucent());
+        for (var block : java.util.List.of(BlockContent.FLUID_CHUTE.get(), BlockContent.ADVANCED_FLUID_CHUTE.get(),
+                BlockContent.ULTIMATE_FLUID_CHUTE.get(), BlockContent.UNIVERSAL_CHUTE.get(),
+                BlockContent.ADVANCED_UNIVERSAL_CHUTE.get(), BlockContent.ULTIMATE_UNIVERSAL_CHUTE.get()))
+            ItemBlockRenderTypes.setRenderLayer(block, RenderType.translucent());
+        ItemBlockRenderTypes.setRenderLayer(BlockContent.SPLITTER.get(), RenderType.translucent());
     }
 }

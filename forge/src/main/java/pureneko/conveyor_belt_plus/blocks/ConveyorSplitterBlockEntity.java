@@ -1,42 +1,46 @@
 package pureneko.conveyor_belt_plus.blocks;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.network.listener.ClientPlayPacketListener;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Pair;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import pureneko.conveyor_belt_plus.registry.BlockContent;
 import pureneko.conveyor_belt_plus.registry.BlockEntitiesContent;
 import pureneko.conveyor_belt_plus.registry.ItemContent;
 import pureneko.conveyor_belt_plus.util.BeltTiers;
 import pureneko.conveyor_belt_plus.util.BeltTransport;
+import pureneko.conveyor_belt_plus.util.BeltTransport.Step;
 import pureneko.conveyor_belt_plus.util.TransportStacks;
 import pureneko.conveyor_belt_plus.util.SplitDistribution;
+import pureneko.conveyor_belt_plus.util.SplitDistribution.Result;
 import pureneko.conveyor_belt_plus.util.BeltVisualState;
 import pureneko.conveyor_belt_plus.util.TierUpgrade;
 import pureneko.conveyor_belt_plus.util.BeltQuad;
 import pureneko.conveyor_belt_plus.util.BeltRenderClock;
+import pureneko.conveyor_belt_plus.blocks.BeltPickup.Access;
+import pureneko.conveyor_belt_plus.blocks.ChuteBlockEntity.BeltItem;
 import pureneko.conveyor_belt_plus.config.ConveyorConfig;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.fluids.FluidStack;
 
 /**
  * A four-sided logistics device with one cached item type.
@@ -71,16 +75,31 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         return outgoing.values();
     }
 
+    @Override public boolean insertOnBelt(Direction port, float progress, ItemStack stack) {
+        if (level == null || level.isClientSide || !BeltInsertion.validStack(stack)) return false;
+        var access = pickupAccess(port);
+        if (access == null || access.data() == null) return false;
+        var offered = stack.copyWithCount(Math.min(stack.getCount(), stack.getMaxStackSize()));
+        if (!BeltTransport.insertAt(access.items(), access.data().totalLength(),
+                new ChuteBlockEntity.BeltItem(progress, nextItemId, offered))) return false;
+        nextItemId++;
+        stack.shrink(offered.getCount());
+        networkDirty = true;
+        setChanged();
+        if (level instanceof ServerLevel serverWorld) serverWorld.getChunkSource().blockChanged(worldPosition);
+        return true;
+    }
+
     @Override public BeltPickup.Access pickupAccess(Direction port) {
         var route = outgoing.get(port);
         return route == null ? null : new BeltPickup.Access(route.beltData, route.beltTier, route.movingItems);
     }
 
     @Override
-    public void tick(World world, BlockPos pos, BlockState state, ConveyorSplitterBlockEntity blockEntity) {
+    public void tick(Level world, BlockPos pos, BlockState state, ConveyorSplitterBlockEntity blockEntity) {
         refreshRouteGeometry(world);
 
-        if (world.isClient) return;
+        if (world.isClientSide) return;
 
         for (var route : outgoing.values()) {
             if (route.beltData != null)
@@ -88,20 +107,20 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         }
         dispatchCachedItems();
 
-        if (networkDirty && world instanceof ServerWorld serverWorld) {
-            serverWorld.getChunkManager().markForUpdate(pos);
+        if (networkDirty && world instanceof ServerLevel serverWorld) {
+            serverWorld.getChunkSource().blockChanged(pos);
             networkDirty = false;
         }
     }
 
-    private void moveItemsOnRoute(World world, Route route) {
+    private void moveItemsOnRoute(Level world, Route route) {
         var step = BeltTransport.tickWithMotion(route.movingItems, route.beltData.totalLength(), BeltTiers.speed(route.beltTier),
                 packet -> ConveyorNodeUtil.accept(world, route.target, route.targetPort, packet.stack));
-        route.visualState.advance(step.distanceMoved(), world.getTime());
+        route.visualState.advance(step.distanceMoved(), world.getGameTime());
         if (step.changed()) {
             // The tick tail broadcasts one update per tick; only the dirty flag is needed here.
             networkDirty = true;
-            markDirty();
+            setChanged();
         }
     }
 
@@ -110,7 +129,7 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
      * re-sample the spline every tick. A build that fails (unusable spline) backs off instead of
      * being retried immediately.
      */
-    private void refreshRouteGeometry(World world) {
+    private void refreshRouteGeometry(Level world) {
         for (var route : outgoing.values()) {
             if (ConveyorNodeUtil.get(world, route.target) == null) {
                 route.beltData = null;
@@ -118,29 +137,29 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
             }
             var signature = geometrySignature(world, route);
             if (route.beltData != null && signature == route.geometrySignature) continue;
-            if (route.geometryRetryAt > world.getTime()) continue;
+            if (route.geometryRetryAt > world.getGameTime()) continue;
             route.geometrySignature = signature;
             route.beltData = createBeltData(route);
-            route.geometryRetryAt = route.beltData == null ? world.getTime() + GEOMETRY_RETRY_TICKS : 0;
+            route.geometryRetryAt = route.beltData == null ? world.getGameTime() + GEOMETRY_RETRY_TICKS : 0;
         }
     }
 
     /** Order-sensitive hash of the blocks that shape a route spline. */
-    private static long geometrySignature(World world, Route route) {
+    private static long geometrySignature(Level world, Route route) {
         long signature = world.getBlockState(route.target).getBlock().hashCode();
         for (var point : route.supports) {
             var state = world.getBlockState(point);
-            if (!state.isOf(BlockContent.CONVEYOR_SUPPORT_BLOCK.get())) continue;
+            if (!state.is(BlockContent.CONVEYOR_SUPPORT_BLOCK.get())) continue;
             signature = signature * 31 + point.asLong();
-            signature = signature * 31 + state.get(HorizontalFacingBlock.FACING).ordinal();
+            signature = signature * 31 + state.getValue(HorizontalDirectionalBlock.FACING).ordinal();
         }
         return signature;
     }
 
     /** Marks the entity dirty and pushes the change to tracking clients. */
     private void markDirtyAndSync() {
-        markDirty();
-        if (world instanceof ServerWorld serverWorld) serverWorld.getChunkManager().markForUpdate(pos);
+        setChanged();
+        if (level instanceof ServerLevel serverWorld) serverWorld.getChunkSource().blockChanged(worldPosition);
     }
 
     private void dispatchCachedItems() {
@@ -149,6 +168,20 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
             var routes = getReadyRoutes();
             if (routes == null) break;
 
+            if (pureneko.conveyor_belt_plus.util.FluidPackets.isPacket(cachedItem)) {
+                var fluid = pureneko.conveyor_belt_plus.util.FluidPackets.get(cachedItem);
+                var distribution = SplitDistribution.divide(fluid.getAmount(), routes.size(), roundRobinIndex);
+                for (int i = 0; i < routes.size(); i++) {
+                    int amount = distribution.counts()[i];
+                    if (amount > 0) routes.get(i).movingItems.addFirst(new ChuteBlockEntity.BeltItem(nextItemId++,
+                            pureneko.conveyor_belt_plus.util.FluidPackets.create(pureneko.conveyor_belt_plus.util.FluidPackets.withAmount(fluid, amount))));
+                }
+                cachedItem = ItemStack.EMPTY;
+                cachedBatches.clear();
+                roundRobinIndex = distribution.nextIndex();
+                networkDirty = changed = true;
+                break;
+            }
             var batchSize = Math.min(cachedBatches.peekFirst(), cachedItem.getCount());
             var distribution = SplitDistribution.divide(batchSize, routes.size(), roundRobinIndex);
 
@@ -163,7 +196,7 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
                 networkDirty = true;
             }
 
-            cachedItem.decrement(batchSize);
+            cachedItem.shrink(batchSize);
             cachedBatches.removeFirst();
             if (cachedItem.isEmpty()) cachedItem = ItemStack.EMPTY;
             roundRobinIndex = distribution.nextIndex();
@@ -171,7 +204,7 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         }
 
         if (cachedItem.isEmpty()) cachedBatches.clear();
-        if (changed) markDirty();
+        if (changed) setChanged();
     }
 
     /** Each input batch is split only across outputs whose entrance currently has room. */
@@ -207,7 +240,7 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
     }
 
     @Override public boolean upgradeOutgoingBelt(Direction port, int tier) {
-        if (world == null || world.isClient || !TierUpgrade.isUpgrade(outgoingBeltTier(port), tier)) return false;
+        if (level == null || level.isClientSide || !TierUpgrade.isUpgrade(outgoingBeltTier(port), tier)) return false;
         outgoing.get(port).beltTier = tier;
         networkDirty = true;
         markDirtyAndSync();
@@ -219,7 +252,7 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         if (hasInputPort(port) && !isPortUsed(port)) {
             incomingSources.put(port, source);
             networkDirty = true;
-            markDirty();
+            setChanged();
         }
     }
 
@@ -238,9 +271,12 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
 
     @Override
     public boolean acceptFromBelt(ItemStack stack, Direction port) {
-        if (world == null || world.isClient || !hasInputPort(port) || !incomingSources.containsKey(port)
+        if (level == null || level.isClientSide || !hasInputPort(port) || !incomingSources.containsKey(port)
                 || stack.isEmpty()) return false;
-        if (!cachedItem.isEmpty() && !ItemStack.canCombine(cachedItem, stack)) return false;
+        // A fluid batch is one carrier with an independent mB quantity; never stack carriers together.
+        if (pureneko.conveyor_belt_plus.util.FluidPackets.isPacket(stack)
+                && (!cachedItem.isEmpty() || stack.getCount() != 1 || pureneko.conveyor_belt_plus.util.FluidPackets.amount(stack) <= 0)) return false;
+        if (!cachedItem.isEmpty() && !ItemStack.isSameItemSameTags(cachedItem, stack)) return false;
 
         var freeSpace = ConveyorConfig.splitterBufferItems() - getCachedItemCount();
         if (stack.getCount() > freeSpace) return false;
@@ -248,9 +284,9 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         if (cachedItem.isEmpty())
             cachedItem = stack.copy();
         else
-            cachedItem.increment(stack.getCount());
+            cachedItem.grow(stack.getCount());
         cachedBatches.addLast(stack.getCount());
-        markDirty();
+        setChanged();
         networkDirty = true;
         return true;
     }
@@ -260,7 +296,7 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
     public boolean acceptPartialFromBelt(ItemStack stack, Direction port) {
         int count = Math.min(stack.getCount(), ConveyorConfig.splitterBufferItems() - getCachedItemCount());
         if (count <= 0 || !acceptFromBelt(stack.copyWithCount(count), port)) return false;
-        stack.decrement(count);
+        stack.shrink(count);
         return stack.isEmpty();
     }
 
@@ -274,8 +310,8 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         var removed = outgoing.entrySet().removeIf(entry -> {
             var route = entry.getValue();
             if (!route.target.equals(destination)) return false;
-            for (var item : route.movingItems) TransportStacks.drop(world, pos, item.stack);
-            TransportStacks.drop(world, pos, ItemContent.beltStackForTier(route.beltTier));
+            for (var item : route.movingItems) TransportStacks.drop(level, worldPosition, item.stack);
+            TransportStacks.drop(level, worldPosition, ItemContent.beltStackForTier(route.beltTier));
             return true;
         });
         if (removed) {
@@ -289,21 +325,21 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         var removed = incomingSources.entrySet().removeIf(entry -> entry.getValue().equals(source));
         if (removed) {
             networkDirty = true;
-            markDirty();
+            setChanged();
         }
     }
 
     private @Nullable ChuteBlockEntity.BeltData createBeltData(Route route) {
-        if (world == null || ConveyorNodeUtil.get(world, route.target) == null) return null;
+        if (level == null || ConveyorNodeUtil.get(level, route.target) == null) return null;
         var midpoints = route.supports.stream()
-                .filter(point -> world.getBlockState(point).isOf(BlockContent.CONVEYOR_SUPPORT_BLOCK.get()))
-                .map(point -> new Pair<>(point, world.getBlockState(point).get(HorizontalFacingBlock.FACING)))
+                .filter(point -> level.getBlockState(point).is(BlockContent.CONVEYOR_SUPPORT_BLOCK.get()))
+                .map(point -> new Tuple<>(point, level.getBlockState(point).getValue(HorizontalDirectionalBlock.FACING)))
                 .toList();
-        return ChuteBlockEntity.BeltData.create(world, pos, route.port, route.target,
+        return ChuteBlockEntity.BeltData.create(level, worldPosition, route.port, route.target,
                 route.targetPort, midpoints);
     }
 
-    public void dropContent(World world, BlockPos pos) {
+    public void dropContent(Level world, BlockPos pos) {
         for (var sourcePos : new ArrayList<>(incomingSources.values())) {
             var source = ConveyorNodeUtil.get(world, sourcePos);
             if (source != null) source.disconnectOutgoingTo(pos);
@@ -327,42 +363,42 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
     }
 
     @Override
-    protected void writeNbt(NbtCompound nbt) {
-        var registryLookup = world == null ? net.minecraft.registry.DynamicRegistryManager.EMPTY : world.getRegistryManager();
-        super.writeNbt(nbt);
+    protected void saveAdditional(CompoundTag nbt) {
+        var registryLookup = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
+        super.saveAdditional(nbt);
         TransportStacks.write(nbt, "cache", cachedItem, registryLookup);
         nbt.putLong("nextItemId", nextItemId);
-        nbt.putLong("snapshotTick", world == null ? 0 : world.getTime());
+        nbt.putLong("snapshotTick", level == null ? 0 : level.getGameTime());
         nbt.putIntArray("cacheBatches", cachedBatches.stream().mapToInt(Integer::intValue).toArray());
 
-        var inputs = new NbtList();
+        var inputs = new ListTag();
         incomingSources.forEach((port, source) -> {
-            var entry = new NbtCompound();
-            entry.putByte("port", (byte) port.getId());
+            var entry = new CompoundTag();
+            entry.putByte("port", (byte) port.get3DDataValue());
             entry.putLong("source", source.asLong());
             inputs.add(entry);
         });
         nbt.put("incoming", inputs);
 
-        var routes = new NbtList();
+        var routes = new ListTag();
         outgoing.forEach((port, route) -> {
-            var entry = new NbtCompound();
-            entry.putByte("port", (byte) port.getId());
+            var entry = new CompoundTag();
+            entry.putByte("port", (byte) port.get3DDataValue());
             entry.putLong("target", route.target.asLong());
-            entry.putByte("targetPort", (byte) route.targetPort.getId());
+            entry.putByte("targetPort", (byte) route.targetPort.get3DDataValue());
             entry.putInt("beltTier", route.beltTier);
             entry.putDouble("beltDistance", route.visualState.distance());
-            entry.putDouble("beltStep", world == null ? 0 : route.visualState.step(world.getTime()));
+            entry.putDouble("beltStep", level == null ? 0 : route.visualState.step(level.getGameTime()));
 
-            var supports = new NbtList();
+            var supports = new ListTag();
             for (var support : route.supports) {
-                var supportTag = new NbtCompound();
+                var supportTag = new CompoundTag();
                 supportTag.putLong("pos", support.asLong());
                 supports.add(supportTag);
             }
             entry.put("supports", supports);
 
-            var moving = new NbtList();
+            var moving = new ListTag();
             for (var item : route.movingItems)
                 moving.add(item.write(registryLookup, "progress", "stack"));
             entry.put("moving", moving);
@@ -373,9 +409,9 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
     }
 
     @Override
-    public void readNbt(NbtCompound nbt) {
-        var registryLookup = world == null ? net.minecraft.registry.DynamicRegistryManager.EMPTY : world.getRegistryManager();
-        super.readNbt(nbt);
+    public void load(CompoundTag nbt) {
+        var registryLookup = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
+        super.load(nbt);
         cachedItem = TransportStacks.read(nbt, "cache", registryLookup);
         nextItemId = nbt.getLong("nextItemId");
         cachedBatches.clear();
@@ -392,64 +428,64 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
         incomingSources.clear();
         outgoing.clear();
 
-        for (var entry : nbt.getList("incoming", NbtElement.COMPOUND_TYPE)) {
-            var tag = (NbtCompound) entry;
-            var port = Direction.byId(tag.getByte("port"));
+        for (var entry : nbt.getList("incoming", Tag.TAG_COMPOUND)) {
+            var tag = (CompoundTag) entry;
+            var port = Direction.from3DDataValue(tag.getByte("port"));
             if (port != null && hasInputPort(port))
-                incomingSources.put(port, BlockPos.fromLong(tag.getLong("source")));
+                incomingSources.put(port, BlockPos.of(tag.getLong("source")));
         }
 
-        for (var entry : nbt.getList("outgoing", NbtElement.COMPOUND_TYPE)) {
-            var tag = (NbtCompound) entry;
-            var port = Direction.byId(tag.getByte("port"));
-            var targetPort = Direction.byId(tag.getByte("targetPort"));
+        for (var entry : nbt.getList("outgoing", Tag.TAG_COMPOUND)) {
+            var tag = (CompoundTag) entry;
+            var port = Direction.from3DDataValue(tag.getByte("port"));
+            var targetPort = Direction.from3DDataValue(tag.getByte("targetPort"));
             if (port == null || targetPort == null || !hasOutputPort(port)) continue;
 
             var supports = new ArrayList<BlockPos>();
-            for (var support : tag.getList("supports", NbtElement.COMPOUND_TYPE))
-                supports.add(BlockPos.fromLong(((NbtCompound) support).getLong("pos")));
+            for (var support : tag.getList("supports", Tag.TAG_COMPOUND))
+                supports.add(BlockPos.of(((CompoundTag) support).getLong("pos")));
 
-            var beltTier = tag.contains("beltTier", NbtElement.INT_TYPE)
+            var beltTier = tag.contains("beltTier", Tag.TAG_INT)
                     ? BeltTiers.normalize(tag.getInt("beltTier")) : BeltTiers.STANDARD;
-            var target = BlockPos.fromLong(tag.getLong("target"));
+            var target = BlockPos.of(tag.getLong("target"));
             var route = previousRoutes.get(port);
             if (route == null || !route.target.equals(target) || route.targetPort != targetPort
                     || !route.supports.equals(supports))
                 route = new Route(port, target, targetPort, supports, beltTier);
             route.beltTier = beltTier; // Keep client packet interpolation and animation during upgrades.
             long snapshotTick = nbt.getLong("snapshotTick");
-            if (world != null && world.isClient)
+            if (level != null && level.isClientSide)
                 route.visualState.receive(tag.getDouble("beltDistance"), tag.getDouble("beltStep"),
-                        snapshotTick, BeltRenderClock.now(world));
+                        snapshotTick, BeltRenderClock.now(level));
             else route.visualState.restore(tag.getDouble("beltDistance"));
             ChuteBlockEntity.BeltItem.readItems(route.movingItems,
-                    tag.getList("moving", NbtElement.COMPOUND_TYPE), registryLookup, world, "progress", "stack", snapshotTick, route.visualState);
+                    tag.getList("moving", Tag.TAG_COMPOUND), registryLookup, level, "progress", "stack", snapshotTick, route.visualState);
             for (var item : route.movingItems) nextItemId = Math.max(nextItemId, item.id + 1);
             outgoing.put(port, route);
         }
 
         roundRobinIndex = Math.max(0, nbt.getInt("roundRobin"));
-        if (world != null) {
+        if (level != null) {
             for (var route : outgoing.values())
                 if (route.beltData == null) route.beltData = createBeltData(route);
         }
     }
 
     @Override
-    public NbtCompound toInitialChunkDataNbt() {
-        var tag = super.toInitialChunkDataNbt();
-        writeNbt(tag);
+    public CompoundTag getUpdateTag() {
+        var tag = super.getUpdateTag();
+        saveAdditional(tag);
         return tag;
     }
 
     @Override
-    public net.minecraft.util.math.Box getRenderBoundingBox() {
+    public net.minecraft.world.phys.AABB getRenderBoundingBox() {
         return net.minecraftforge.common.extensions.IForgeBlockEntity.INFINITE_EXTENT_AABB;
     }
 
     @Override
-    public @Nullable Packet<ClientPlayPacketListener> toUpdatePacket() {
-        return BlockEntityUpdateS2CPacket.create(this);
+    public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     public static final class Route {

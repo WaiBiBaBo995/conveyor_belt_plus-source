@@ -8,7 +8,7 @@ repositories {
 }
 dependencies {
     minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
-    mappings "net.fabricmc:yarn:$rootProject.yarn_mappings:v2"
+    mappings loom.officialMojangMappings()
     forge "net.minecraftforge:forge:$rootProject.minecraft_version-$rootProject.forge_version"
     modCompileOnly "mezz.jei:jei-$rootProject.minecraft_version-common-api:$rootProject.jei_version"
     modCompileOnly "maven.modrinth:jade:$rootProject.jade_version"
@@ -41,7 +41,7 @@ def integrationRuntime = ['withRts', 'withJade', 'withJei'].any {
     providers.gradleProperty(it).getOrElse('false').toBoolean()
 }
 // Keep optional-mod registries out of the base test world's save data.
-def gameTestDirectory = integrationRuntime ? 'run-gametest-integrations-forge-1.20.1' : 'run-gametest-forge-1.20.1'
+def gameTestDirectory = integrationRuntime ? 'build/run-gametest-integrations-forge-1.20.1' : 'build/run-gametest-forge-1.20.1'
 loom {
     mods { conveyor_belt_plus { sourceSet sourceSets.main } }
     runs {
@@ -68,12 +68,12 @@ processResources {
     inputs.property 'version', project.version
     filesMatching('META-INF/mods.toml') { expand version: project.version }
     from(rootProject.projectDir) {
-        include 'LICENSE'
+        include 'LICENSE', 'LICENSES/**', 'THIRD_PARTY_NOTICES.md'
     }
 }
 tasks.named('sourcesJar') {
     from(rootProject.projectDir) {
-        include 'LICENSE'
+        include 'LICENSE', 'LICENSES/**', 'THIRD_PARTY_NOTICES.md'
     }
 }
 tasks.register('regressionTest', JavaExec) {
@@ -106,6 +106,7 @@ tasks.named('processTestResources') { dependsOn 'generateGameTestTemplate' }
 tasks.named('test') {
     // Tests use JavaExec and Forge GameTest; support classes are not JUnit tests.
     exclude '**/*Tests*'
+    failOnNoDiscoveredTests = false
     dependsOn 'regressionTest', 'runGameTest'
 }
 tasks.register('resourceIntegrityTest') {

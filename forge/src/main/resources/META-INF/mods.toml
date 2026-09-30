@@ -9,7 +9,7 @@ version = "${version}"
 displayName = "Conveyor Belt Plus"
 authors = "pureneko,sorahina309"
 description = '''
-Spline-based belts with a single-item-type splitter and safe route validation.
+Shared item/fluid conveyors, three-tier item, fluid and universal interfaces, and configurable filters.
 '''
 logoFile = "logo.png"
 

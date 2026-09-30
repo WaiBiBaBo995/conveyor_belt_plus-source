@@ -33,7 +33,7 @@ public final class ProgressAnimation {
         for (Sample next : samples) {
             if (tick < next.tick) {
                 double span = next.tick - previous.tick;
-                double alpha = span > 0 ? net.minecraft.util.math.MathHelper.clamp((tick - previous.tick) / span, 0, 1) : 0;
+                double alpha = span > 0 ? net.minecraft.util.Mth.clamp((tick - previous.tick) / span, 0, 1) : 0;
                 result = previous.value + (next.value - previous.value) * alpha;
                 break;
             }
