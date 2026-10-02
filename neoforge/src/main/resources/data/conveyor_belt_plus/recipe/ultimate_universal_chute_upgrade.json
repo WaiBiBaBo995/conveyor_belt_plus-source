@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " R ",
+    "GCG",
+    " R "
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone_block"
+    },
+    "G": {
+      "item": "minecraft:diamond"
+    },
+    "C": {
+      "item": "conveyor_belt_plus:advanced_universal_chute"
+    }
+  },
+  "result": {
+    "id": "conveyor_belt_plus:ultimate_universal_chute",
+    "count": 1
+  }
+}

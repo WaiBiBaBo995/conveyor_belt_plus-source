@@ -1,7 +1,7 @@
 package pureneko.conveyor_belt_plus.registry;
 
-import net.minecraft.util.Identifier;
 import net.neoforged.bus.api.IEventBus;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.fml.common.Mod;
 import org.slf4j.Logger;
@@ -25,9 +25,13 @@ public final class ConveyorBeltPlus {
         ScreenContent.MENUS.register(modBus);
         modBus.addListener(EventPriority.LOWEST, LegacyRegistryAliases::register);
         modBus.addListener(FilterNetworking::register);
+        modBus.addListener((net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent event) ->
+                event.registerItem(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.ITEM,
+                        (stack, context) -> pureneko.conveyor_belt_plus.neoforge.ConveyorFluidApi.packetHandler(stack), ItemContent.FLUID_PACKET.get()));
         modBus.addListener(pureneko.conveyor_belt_plus.network.PickupNetworking::register);
+        modBus.addListener(pureneko.conveyor_belt_plus.network.InsertionNetworking::register);
         modBus.addListener(pureneko.conveyor_belt_plus.network.RtsNetworking::register);
     }
 
-    public static Identifier id(String path) { return Identifier.of(MOD_ID, path); }
+    public static ResourceLocation id(String path) { return ResourceLocation.fromNamespaceAndPath(MOD_ID, path); }
 }

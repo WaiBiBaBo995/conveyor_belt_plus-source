@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "conveyor_belt_plus:advanced_item_chute"
+    },
+    {
+      "item": "conveyor_belt_plus:advanced_fluid_chute"
+    }
+  ],
+  "result": {
+    "id": "conveyor_belt_plus:advanced_universal_chute",
+    "count": 1
+  }
+}

@@ -14,11 +14,11 @@
       "item": "minecraft:gold_ingot"
     },
     "C": {
-      "item": "conveyor_belt_plus:chute"
+      "item": "conveyor_belt_plus:item_chute"
     }
   },
   "result": {
-    "id": "conveyor_belt_plus:advanced_chute",
+    "id": "conveyor_belt_plus:advanced_item_chute",
     "count": 1
   }
 }

@@ -1,6 +1,6 @@
 package pureneko.conveyor_belt_plus.util;
 
-import net.minecraft.world.World;
+import net.minecraft.world.level.Level;
 
 /**
  * Client ticks without the periodic jumps caused by server world-time synchronization.
@@ -8,29 +8,29 @@ import net.minecraft.world.World;
  * holds no client class so shared code can query it safely.
  */
 public final class BeltRenderClock {
-    private static World currentWorld;
+    private static Level currentWorld;
     private static long ticks;
 
     private BeltRenderClock() {}
 
-    public static void advance(World world, boolean paused) {
+    public static void advance(Level world, boolean paused) {
         bind(world);
         if (world != null && !paused) ticks++;
     }
 
-    private static void bind(World world) {
+    private static void bind(Level world) {
         if (world != currentWorld) {
             currentWorld = world;
             ticks = 0;
         }
     }
 
-    public static double now(World world) {
+    public static double now(Level world) {
         bind(world);
         return ticks;
     }
 
-    public static double renderTime(World world, float tickDelta) {
+    public static double renderTime(Level world, float tickDelta) {
         return now(world) + tickDelta;
     }
 }

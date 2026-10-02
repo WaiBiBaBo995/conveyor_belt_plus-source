@@ -1,16 +1,18 @@
 package pureneko.conveyor_belt_plus.blocks;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-
 import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 
 /** Common connection contract for chutes and multi-port logistics blocks. */
 public interface ConveyorNode {
 
     /** Only requested on a click/update, not every frame or tick. */
     default BeltPickup.Access pickupAccess(Direction port) { return null; }
+
+    /** Consume the offered stack only if a packet can be inserted at this route position. */
+    default boolean insertOnBelt(Direction port, float progress, ItemStack stack) { return false; }
 
     boolean hasInputPort(Direction port);
 
@@ -31,11 +33,6 @@ public interface ConveyorNode {
 
     /** Accepts one complete stack and owns it when returning true. */
     boolean acceptFromBelt(ItemStack stack, Direction port);
-
-    /** Admits as much of the stack as fits and shrinks the remainder; defaults to all-or-nothing. */
-    default boolean acceptPartialFromBelt(ItemStack stack, Direction port) {
-        return acceptFromBelt(stack, port);
-    }
 
     void markTargeted(BlockPos source);
 
