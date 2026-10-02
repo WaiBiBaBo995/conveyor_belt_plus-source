@@ -31,7 +31,8 @@ final class ConfigTestSupport {
             try {
                 if (key.equals("chute.extraction_sides_enabled")) config.set(key,
                         value.equals("true") ? Boolean.TRUE : value.equals("false") ? Boolean.FALSE : value);
-                else if (key.endsWith(".speed")) config.set(key, Double.parseDouble(value));
+                else if (key.endsWith(".speed") || key.equals("belt.minimum_angle") || key.equals("belt.minimum_turn_radius"))
+                    config.set(key, Double.parseDouble(value));
                 else config.set(key, Integer.parseInt(value));
             } catch (NumberFormatException ex) { config.set(key, value); }
         }
@@ -49,5 +50,7 @@ final class ConfigTestSupport {
         }
         ConveyorConfig.SPLITTER_BUFFER.set(config.<Number>get("splitter.buffer_items").intValue());
         ConveyorConfig.CHUTE_EXTRACTION_SIDES.set(config.<Boolean>get("chute.extraction_sides_enabled"));
+        ConveyorConfig.MINIMUM_BELT_ANGLE.set(config.<Number>get("belt.minimum_angle").doubleValue());
+        ConveyorConfig.MINIMUM_BELT_TURN_RADIUS.set(config.<Number>get("belt.minimum_turn_radius").doubleValue());
     }
 }

@@ -8,6 +8,7 @@ import pureneko.conveyor_belt_plus.blocks.ConveyorNode;
 import pureneko.conveyor_belt_plus.blocks.ConveyorNodeUtil;
 import pureneko.conveyor_belt_plus.util.BeltTiers;
 import pureneko.conveyor_belt_plus.util.ChutePlacementPlan;
+import pureneko.conveyor_belt_plus.util.SplineUtil;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.ChatFormatting;
@@ -216,6 +217,16 @@ public class BeltItem extends Item {
                 player.displayClientMessage(Component.translatable("message.conveyor_belt_plus.rts_forbidden"), true);
                 return false;
             }
+        }
+        var path = ChuteBlockEntity.BeltData.create(world, start, startDir, end, endDir, supports,
+                true, pureneko.conveyor_belt_plus.config.ConveyorConfig.minimumBeltTurnRadius(), 0);
+        if (path == null) {
+            player.displayClientMessage(Component.translatable("message.conveyor_belt_plus.turn_too_sharp"), true);
+            return false;
+        }
+        if (!SplineUtil.meetsMinimumIncline(path.arcPath(), pureneko.conveyor_belt_plus.config.ConveyorConfig.minimumBeltAngle())) {
+            player.displayClientMessage(Component.translatable("message.conveyor_belt_plus.minimum_angle"), true);
+            return false;
         }
         var inventory = ChutePlacementPlan.orderedInventory(player);
         var plan = ChutePlacementPlan.select(inventory,

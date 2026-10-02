@@ -17,6 +17,8 @@ public final class ConveyorConfig {
     public static final ForgeConfigSpec.IntValue[] FLUID_FILTER_LIMITS = new ForgeConfigSpec.IntValue[3];
     public static final ForgeConfigSpec.IntValue SPLITTER_BUFFER;
     public static final ForgeConfigSpec.BooleanValue CHUTE_EXTRACTION_SIDES;
+    public static final ForgeConfigSpec.DoubleValue MINIMUM_BELT_ANGLE;
+    public static final ForgeConfigSpec.DoubleValue MINIMUM_BELT_TURN_RADIUS;
 
     static {
         var builder = new ForgeConfigSpec.Builder();
@@ -52,6 +54,14 @@ public final class ConveyorConfig {
                         "When disabled, hide the panel and use only the attached face; preserve saved selections and leave insertion unchanged.")
                 .translation("config.conveyor_belt_plus.chute.extraction_sides_enabled")
                 .define("chute.extraction_sides_enabled", true);
+        MINIMUM_BELT_ANGLE = builder.comment("传送带允许放置的最小坡度角（度），按相邻端点/支架之间的垂直落差和水平距离分别计算；0 表示不限制。",
+                        "Minimum incline angle in degrees for each endpoint-to-support section; 0 disables the limit.")
+                .translation("config.conveyor_belt_plus.belt.minimum_angle")
+                .defineInRange("belt.minimum_angle", 0.0, 0.0, 90.0);
+        MINIMUM_BELT_TURN_RADIUS = builder.comment("传送带允许放置的最小局部转弯半径（格）；0 表示不限制。",
+                        "Minimum local turn radius in blocks required to place a belt; 0 disables the limit.")
+                .translation("config.conveyor_belt_plus.belt.minimum_turn_radius")
+                .defineInRange("belt.minimum_turn_radius", 1.25, 0.0, 64.0);
         SPEC = builder.build();
     }
 
@@ -72,4 +82,12 @@ public final class ConveyorConfig {
     public static int fluidFilters(int tier) { return value(FLUID_FILTER_LIMITS[net.minecraft.util.Mth.clamp(tier, 1, 3) - 1]); }
     public static int splitterBufferItems() { return value(SPLITTER_BUFFER); }
     public static boolean extractionSidesEnabled() { return value(CHUTE_EXTRACTION_SIDES); }
+    public static double minimumBeltAngle() {
+        double angle = value(MINIMUM_BELT_ANGLE);
+        return Double.isFinite(angle) ? angle : MINIMUM_BELT_ANGLE.getDefault();
+    }
+    public static double minimumBeltTurnRadius() {
+        double radius = value(MINIMUM_BELT_TURN_RADIUS);
+        return Double.isFinite(radius) ? radius : MINIMUM_BELT_TURN_RADIUS.getDefault();
+    }
 }

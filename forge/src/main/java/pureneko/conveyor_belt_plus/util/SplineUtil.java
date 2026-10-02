@@ -11,7 +11,7 @@ public final class SplineUtil {
     private SplineUtil() {}
 
     private static final int PATH_SAMPLES = 96;
-    private static final double MIN_TURN_RADIUS = 1.25;
+    public static final double DEFAULT_MIN_TURN_RADIUS = 1.25;
     private static final double MIN_ENDPOINT_ALIGNMENT = Math.cos(Math.toRadians(60));
 
     public static Vec3 getPositionOnSpline(ChuteBlockEntity.BeltData data, double t) {
@@ -27,10 +27,16 @@ public final class SplineUtil {
     public static final class ArcLengthPath {
         private final Vec3[] points;
         private final double[] distances;
+        private final int[] segmentStarts;
+        private final int[] segmentEnds;
+        private final double totalLength;
 
-        private ArcLengthPath(Vec3[] points, double[] distances) {
+        private ArcLengthPath(Vec3[] points, double[] distances, int[] segmentStarts, int[] segmentEnds) {
             this.points = points;
             this.distances = distances;
+            this.segmentStarts = segmentStarts;
+            this.segmentEnds = segmentEnds;
+            this.totalLength = distances[distances.length - 1];
         }
 
         public static ArcLengthPath create(List<Tuple<Vec3, Vec3>> controls) {
@@ -42,8 +48,11 @@ public final class SplineUtil {
             var cumulative = new ArrayList<Double>();
             samples.add(controls.get(0).getA());
             cumulative.add(0d);
+            var segmentStarts = new int[controls.size() - 1];
+            var segmentEnds = new int[controls.size() - 1];
             double distance = 0;
             for (int segment = 0; segment < controls.size() - 1; segment++) {
+                segmentStarts[segment] = samples.size() - 1;
                 var from = controls.get(segment);
                 var to = controls.get(segment + 1);
                 double tangentLength = lengths[segment] * 1.5;
@@ -55,12 +64,14 @@ public final class SplineUtil {
                     samples.add(point);
                     cumulative.add(distance);
                 }
+                segmentEnds[segment] = samples.size() - 1;
             }
             return new ArcLengthPath(samples.toArray(Vec3[]::new),
-                    cumulative.stream().mapToDouble(Double::doubleValue).toArray());
+                    cumulative.stream().mapToDouble(Double::doubleValue).toArray(),
+                    segmentStarts, segmentEnds);
         }
 
-        public double length() { return distances[distances.length - 1]; }
+        public double length() { return totalLength; }
 
         public Vec3 position(double progress) {
             if (progress <= 0 || length() <= 0) return points[0];
@@ -114,33 +125,68 @@ public final class SplineUtil {
 
     /** Validates the same cached path used by transport and rendering. */
     public static boolean isPathUsable(ArcLengthPath arc, Vec3 startDir, Vec3 endDir) {
+        return isPathUsable(arc, startDir, endDir, DEFAULT_MIN_TURN_RADIUS, 0);
+    }
+
+    public static boolean isPathUsable(ArcLengthPath arc, Vec3 startDir, Vec3 endDir,
+                                       double minimumAngleDegrees) {
+        return isPathUsable(arc, startDir, endDir, DEFAULT_MIN_TURN_RADIUS, minimumAngleDegrees);
+    }
+
+    public static boolean isPathUsable(ArcLengthPath arc, Vec3 startDir, Vec3 endDir,
+                                       double minimumTurnRadius, double minimumAngleDegrees) {
         var totalLength = arc.length();
         if (!Double.isFinite(totalLength) || totalLength < 0.35) return false;
 
-        var samples = new Vec3[PATH_SAMPLES + 1];
-        for (int i = 0; i <= PATH_SAMPLES; i++)
-            samples[i] = arc.position(i / (double) PATH_SAMPLES);
-
-        var startTravel = samples[1].subtract(samples[0]);
-        var endTravel = samples[PATH_SAMPLES].subtract(samples[PATH_SAMPLES - 1]);
+        var start = arc.position(0);
+        var end = arc.position(1);
+        var startTravel = arc.position(1 / (double) PATH_SAMPLES).subtract(start);
+        var endTravel = end.subtract(arc.position((PATH_SAMPLES - 1) / (double) PATH_SAMPLES));
         if (startTravel.lengthSqr() < 1.0E-8 || endTravel.lengthSqr() < 1.0E-8)
             return false;
         if (startTravel.normalize().dot(startDir.normalize()) < MIN_ENDPOINT_ALIGNMENT
                 || endTravel.normalize().dot(endDir.normalize()) < MIN_ENDPOINT_ALIGNMENT)
             return false;
 
-        for (int i = 1; i < PATH_SAMPLES; i++) {
-            var incoming = samples[i].subtract(samples[i - 1]);
-            var outgoing = samples[i + 1].subtract(samples[i]);
-            if (incoming.lengthSqr() < 1.0E-8 || outgoing.lengthSqr() < 1.0E-8) return false;
+        if (minimumTurnRadius <= 0)
+            return minimumAngleDegrees <= 0 || meetsMinimumIncline(arc, minimumAngleDegrees);
 
-            var dot = Math.max(-1, Math.min(1,
-                    incoming.normalize().dot(outgoing.normalize())));
-            var turnAngle = Math.acos(dot);
-            if (turnAngle > 0.05) {
-                var localArcLength = (incoming.length() + outgoing.length()) * 0.5;
-                if (localArcLength / turnAngle < MIN_TURN_RADIUS) return false;
+        var samples = new Vec3[PATH_SAMPLES + 1];
+        samples[0] = start;
+        samples[PATH_SAMPLES] = end;
+        for (int i = 1; i < PATH_SAMPLES; i++)
+            samples[i] = arc.position(i / (double) PATH_SAMPLES);
+
+        for (int segment = 0; segment < arc.segmentStarts.length; segment++) {
+            int first = (int) Math.round(arc.distances[arc.segmentStarts[segment]] / totalLength * PATH_SAMPLES);
+            int last = (int) Math.round(arc.distances[arc.segmentEnds[segment]] / totalLength * PATH_SAMPLES);
+            first = Math.max(0, Math.min(PATH_SAMPLES, first));
+            last = Math.max(first, Math.min(PATH_SAMPLES, last));
+            for (int i = first + 1; i < last; i++) {
+                var incoming = samples[i].subtract(samples[i - 1]);
+                var outgoing = samples[i + 1].subtract(samples[i]);
+                if (incoming.lengthSqr() < 1.0E-8 || outgoing.lengthSqr() < 1.0E-8) return false;
+
+                var dot = Math.max(-1, Math.min(1,
+                        incoming.normalize().dot(outgoing.normalize())));
+                var turnAngle = Math.acos(dot);
+                if (turnAngle > 0.05) {
+                    var localArcLength = (incoming.length() + outgoing.length()) * 0.5;
+                    if (minimumTurnRadius > 0 && localArcLength / turnAngle < minimumTurnRadius) return false;
+                }
             }
+        }
+        return minimumAngleDegrees <= 0 || meetsMinimumIncline(arc, minimumAngleDegrees);
+    }
+
+    public static boolean meetsMinimumIncline(ArcLengthPath arc, double minimumAngleDegrees) {
+        if (!Double.isFinite(minimumAngleDegrees) || minimumAngleDegrees <= 0) return true;
+        for (int segment = 0; segment < arc.segmentStarts.length; segment++) {
+            var start = arc.points[arc.segmentStarts[segment]];
+            var end = arc.points[arc.segmentEnds[segment]];
+            double horizontalDistance = Math.hypot(end.x - start.x, end.z - start.z);
+            double angle = Math.toDegrees(Math.atan2(Math.abs(end.y - start.y), horizontalDistance));
+            if (angle + 1.0E-7 < minimumAngleDegrees) return false;
         }
         return true;
     }
@@ -158,17 +204,14 @@ public final class SplineUtil {
     // calculates the facing of the middle points automatically. Returns a pair for each point with the desired tangent (to the next point)
     public static List<Tuple<Vec3, Vec3>> getPointPairs(Vec3 start, Vec3 startDir, Vec3 end, Vec3 endDir, List<Tuple<Vec3, Vec3>> middlePoints) {
 
-        var pendingPoints = new ArrayList<Tuple<Vec3, Vec3>>();
-        pendingPoints.addAll(middlePoints);
-        pendingPoints.add(new Tuple<>(end, endDir));
-
         var pointsWithTangents = new ArrayList<Tuple<Vec3, Vec3>>();
         pointsWithTangents.add(new Tuple<>(start, startDir));
 
         var currentFrom = start.add(startDir.scale(0.3f));
 
-        while (!pendingPoints.isEmpty()) {
-            var pair = pendingPoints.remove(0);
+        for (int index = 0; index <= middlePoints.size(); index++) {
+            var pair = index < middlePoints.size()
+                    ? middlePoints.get(index) : new Tuple<>(end, endDir);
 
             if (pair.getA().equals(end)) {
                 pointsWithTangents.add(new Tuple<>(end, endDir));

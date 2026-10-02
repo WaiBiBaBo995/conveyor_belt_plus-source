@@ -94,7 +94,9 @@ public class BeltOutlineRenderer {
         boolean validStart = startNode == null ? world.getBlockState(start).canBeReplaced()
                 : startNode.hasOutputPort(startFacing) && !startNode.isPortUsed(startFacing);
         int needed = (startNode == null ? 1 : 0) + (node == null && !isSupport ? 1 : 0);
-        var validData = ChuteBlockEntity.BeltData.create(world, start, startFacing, end, endPort, midpoints);
+        var validData = ChuteBlockEntity.BeltData.create(world, start, startFacing, end, endPort, midpoints,
+                true, pureneko.conveyor_belt_plus.config.ConveyorConfig.minimumBeltTurnRadius(),
+                pureneko.conveyor_belt_plus.config.ConveyorConfig.minimumBeltAngle());
         boolean valid = validStart && validEnd && availableChutes >= needed && validData != null;
         var data = validData != null ? validData
                 : ChuteBlockEntity.BeltData.create(world, start, startFacing, end, endPort, midpoints, false);

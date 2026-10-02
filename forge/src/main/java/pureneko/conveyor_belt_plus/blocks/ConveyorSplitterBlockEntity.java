@@ -261,7 +261,7 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
                                    List<BlockPos> supports, int beltTier) {
         if (!hasOutputPort(port) || isPortUsed(port)) return false;
         var route = new Route(port, target, targetPort, List.copyOf(supports), BeltTiers.normalize(beltTier));
-        route.beltData = createBeltData(route);
+        route.beltData = createBeltData(route, ConveyorConfig.minimumBeltTurnRadius(), ConveyorConfig.minimumBeltAngle());
         if (route.beltData == null) return false;
         outgoing.put(port, route);
         networkDirty = true;
@@ -330,13 +330,18 @@ public class ConveyorSplitterBlockEntity extends BlockEntity
     }
 
     private @Nullable ChuteBlockEntity.BeltData createBeltData(Route route) {
+        return createBeltData(route, 0, 0);
+    }
+
+    private @Nullable ChuteBlockEntity.BeltData createBeltData(Route route, double minimumTurnRadius,
+                                                             double minimumAngleDegrees) {
         if (level == null || ConveyorNodeUtil.get(level, route.target) == null) return null;
         var midpoints = route.supports.stream()
                 .filter(point -> level.getBlockState(point).is(BlockContent.CONVEYOR_SUPPORT_BLOCK.get()))
                 .map(point -> new Tuple<>(point, level.getBlockState(point).getValue(HorizontalDirectionalBlock.FACING)))
                 .toList();
         return ChuteBlockEntity.BeltData.create(level, worldPosition, route.port, route.target,
-                route.targetPort, midpoints);
+                route.targetPort, midpoints, true, minimumTurnRadius, minimumAngleDegrees);
     }
 
     public void dropContent(Level world, BlockPos pos) {

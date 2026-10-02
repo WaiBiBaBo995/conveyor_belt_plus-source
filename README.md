@@ -4,6 +4,12 @@ Conveyor Belt Plus 3.7.0 provides Minecraft 1.21.1 / NeoForge / Java 21, based o
 
 JEI, Jade and RTS Building are optional. Replace the previous jar rather than installing two versions together, and back up existing worlds before upgrading.
 
+## Attribution and third-party licenses
+
+Conveyor Belt Plus contains adapted code and behavior derived from [SimpleBelts](https://github.com/Rearth/SimpleBelts), created and maintained by [Rearth](https://github.com/Rearth). The upstream material is licensed under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://github.com/Rearth/SimpleBelts/blob/master/LICENSE). This project is an independent port and extension: the adapted material has been changed for the supported Minecraft/Forge versions, package layout and features, and includes further fixes and additions by the Conveyor Belt Plus contributors. No endorsement by Rearth is implied.
+
+The upstream CC BY 4.0 license includes its warranty disclaimer. Project-original material remains available under the MIT License in `LICENSE`; the attribution and license terms above continue to apply to the adapted SimpleBelts material.
+
 
 ## Features
 
@@ -42,6 +48,8 @@ The built-in configuration screen is registered: Mods → Conveyor Belt Plus →
 `splitter.buffer_items` still defaults to 512 individual items (range 1..1048576); reducing capacity never deletes existing contents.
 
 Limits remain: belt speeds 0.1..64 blocks/s, chute batches 1..64 stacks, total filter rules 1..54. Rules beyond a reduced capacity remain saved but inactive.
+
+`belt.minimum_angle` and `belt.minimum_turn_radius` are reset at each explicitly selected conveyor support, so every endpoint-to-support section is checked independently. A value of `0` disables that individual limit; basic path geometry and endpoint direction checks remain active.
 
 `fluid_chute.<standard|advanced|ultimate>.millibuckets` sets the fluid batch size (1..1048576 mB); `.filters` sets each fluid rule limit (1..54). Universal interfaces use the item and fluid settings for the respective tab.
 
@@ -99,6 +107,12 @@ Conveyor Belt Plus 3.7.0 提供 Minecraft 1.21.1 / NeoForge / Java 21 支持，�
 
 JEI、Jade 和 RTS Building 是可选的。请替换之前的 jar，而不是同时安装两个版本，并在升级前备份现有世界。
 
+## 署名与第三方许可证
+
+Conveyor Belt Plus 包含改编自 [SimpleBelts](https://github.com/Rearth/SimpleBelts) 的代码和行为实现，原作者/维护者为 [Rearth](https://github.com/Rearth)。上游内容采用 [Creative Commons Attribution 4.0 International（CC BY 4.0）许可证](https://github.com/Rearth/SimpleBelts/blob/master/LICENSE)。本项目是独立的移植和扩展：相关内容已针对支持的 Minecraft/Forge 版本、包结构和功能进行修改，并由 Conveyor Belt Plus 贡献者加入了额外修复和功能；这不表示 Rearth 对本项目的背书。
+
+上游 CC BY 4.0 许可证包含其“按现状提供”的免责声明。项目原创内容继续按照本项目 `LICENSE` 中的 MIT 许可证提供；上述署名和许可证条款仍适用于改编自 SimpleBelts 的内容。
+
 ## 特性
 
 - 三个物品、流体和通用接口等级，共享传送带和分流器。物品 ID 现在为 `item_chute`、`advanced_item_chute` 和 `ultimate_item_chute`；旧 ID 通过注册表别名迁移。
@@ -136,6 +150,8 @@ JEI、Jade 和 RTS Building 是可选的。请替换之前的 jar，而不是同
 `splitter.buffer_items` 仍默认为 512 个单个物品（范围 1..1048576）；减少容量绝不会删除现有内容。
 
 限制保持不变：传送带速度 0.1..64 方块/秒，滑槽批次 1..64 堆叠，总过滤规则 1..54。超出减少后容量的规则仍会保存但处于非活动状态。
+
+`belt.minimum_angle` 与 `belt.minimum_turn_radius` 会在每个手动选择的传送带支架处重新计算，因此各端点到支架之间的区段分别判断。单项设为 `0` 可关闭对应限制，但基础路径几何和端点方向检查仍然生效。
 
 `fluid_chute.<standard|advanced|ultimate>.millibuckets` 设置流体批次大小（1..1048576 mB）；`.filters` 设置每个流体规则限制（1..54）。通用接口对相应标签页使用物品和流体设置。
 

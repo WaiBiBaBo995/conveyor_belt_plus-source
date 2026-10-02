@@ -90,6 +90,8 @@ public final class ConveyorRegressionTests {
 
     private static void configuration() {
         ConfigTestSupport.apply(new Properties(), ignored -> {});
+        check(ConveyorConfig.minimumBeltAngle() == 0, "minimum belt angle defaults to zero");
+        check(ConveyorConfig.minimumBeltTurnRadius() == 1.25, "minimum belt turn radius defaults to 1.25");
         check(ConveyorConfig.chuteFilters(1) == 5, "ordinary chute has five rules");
         check(ConveyorConfig.chuteFilters(2) == 10, "advanced has ten rules");
         check(ConveyorConfig.chuteFilters(3) == 15, "ultimate has fifteen rules");
@@ -100,6 +102,12 @@ public final class ConveyorRegressionTests {
         properties.setProperty("chute.ultimate.stacks", "32");
         ConfigTestSupport.apply(properties, ignored -> {});
         check(BeltTiers.speed(3) == 12.5f && ConveyorConfig.chuteStacks(3) == 32, "custom configuration");
+        properties.setProperty("belt.minimum_angle", "12.5");
+        ConfigTestSupport.apply(properties, ignored -> {});
+        check(ConveyorConfig.minimumBeltAngle() == 12.5, "custom minimum belt angle");
+        properties.setProperty("belt.minimum_turn_radius", "3.5");
+        ConfigTestSupport.apply(properties, ignored -> {});
+        check(ConveyorConfig.minimumBeltTurnRadius() == 3.5, "custom minimum belt turn radius");
         properties.setProperty("belt.ultimate.speed", "NaN");
         properties.setProperty("belt.advanced.speed", "-1");
         properties.setProperty("chute.ultimate.stacks", "2147483647");

@@ -214,7 +214,7 @@ public final class TransportNbtTests {
         var previous = curve.arcPath().position(0);
         for (int step = 1; step <= 400; step++) {
             var point = curve.arcPath().position(step / 400d);
-            check(Math.abs(point.distanceTo(previous) - segmentLength) < 0.001,
+        check(Math.abs(point.distanceTo(previous) - segmentLength) < 0.001,
                     "constant speed around corners");
             previous = point;
         }
@@ -223,6 +223,21 @@ public final class TransportNbtTests {
                 new net.minecraft.util.Tuple<>(new net.minecraft.world.phys.Vec3(10, 0, 0), east)));
         check(pureneko.conveyor_belt_plus.util.SplineUtil.isPathUsable(validPath, east, east),
                 "straight path remains valid");
+        check(!pureneko.conveyor_belt_plus.util.SplineUtil.meetsMinimumIncline(validPath, 1),
+                "horizontal path does not satisfy a positive minimum incline");
+        var risingPath = pureneko.conveyor_belt_plus.util.SplineUtil.ArcLengthPath.create(java.util.List.of(
+                new net.minecraft.util.Tuple<>(start, east),
+                new net.minecraft.util.Tuple<>(new net.minecraft.world.phys.Vec3(10, 10 * Math.tan(Math.toRadians(30)), 0), east)));
+        check(pureneko.conveyor_belt_plus.util.SplineUtil.meetsMinimumIncline(risingPath, 30),
+                "rising path satisfies its configured minimum incline");
+        check(!pureneko.conveyor_belt_plus.util.SplineUtil.meetsMinimumIncline(risingPath, 30.1),
+                "rising path rejects a larger minimum incline");
+        var supportedSPath = pureneko.conveyor_belt_plus.util.SplineUtil.ArcLengthPath.create(java.util.List.of(
+                new net.minecraft.util.Tuple<>(start, east),
+                new net.minecraft.util.Tuple<>(new net.minecraft.world.phys.Vec3(10, 10, 0), east),
+                new net.minecraft.util.Tuple<>(new net.minecraft.world.phys.Vec3(20, 0, 0), east)));
+        check(pureneko.conveyor_belt_plus.util.SplineUtil.meetsMinimumIncline(supportedSPath, 30),
+                "support resets the minimum incline calculation per section");
         var reversal = pureneko.conveyor_belt_plus.util.SplineUtil.ArcLengthPath.create(java.util.List.of(
                 new net.minecraft.util.Tuple<>(start, east),
                 new net.minecraft.util.Tuple<>(new net.minecraft.world.phys.Vec3(1, 0, 0), east.reverse())));

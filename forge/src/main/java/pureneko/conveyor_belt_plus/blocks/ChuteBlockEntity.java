@@ -589,7 +589,8 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
     public boolean assignFromBeltItem(BlockPos target, Direction targetFacing,
                                       List<BlockPos> midpoints, int beltTier) {
         if (level == null || BeltData.create(level, worldPosition, getOwnFacing(), target, targetFacing,
-                midpoints.stream().map(point -> new Tuple<>(point, level.getBlockState(point).getValue(HorizontalDirectionalBlock.FACING))).toList()) == null)
+                midpoints.stream().map(point -> new Tuple<>(point, level.getBlockState(point).getValue(HorizontalDirectionalBlock.FACING))).toList(),
+                true, ConveyorConfig.minimumBeltTurnRadius(), ConveyorConfig.minimumBeltAngle()) == null)
             return false;
         this.target = target;
         this.targetFacing = targetFacing;
@@ -730,13 +731,13 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
             var targetNode = ConveyorNodeUtil.get(entity.getLevel(), entity.getTarget());
             if (targetNode == null) return null;
             return create(entity.getLevel(), entity.getBlockPos(), entity.getOwnFacing(), entity.getTarget(),
-                    entity.targetFacing, entity.getMidPointsWithTangents());
+                    entity.targetFacing, entity.getMidPointsWithTangents(), true, 0, 0);
         }
 
         public static @Nullable BeltData create(Level world, BlockPos start, Direction startFacing,
-                                                BlockPos target, Direction targetFacing,
-                                                List<Tuple<BlockPos, Direction>> midPoints) {
-            return create(world, start, startFacing, target, targetFacing, midPoints, true);
+                                                 BlockPos target, Direction targetFacing,
+                                                 List<Tuple<BlockPos, Direction>> midPoints) {
+            return create(world, start, startFacing, target, targetFacing, midPoints, true, 0);
         }
 
         public static Vec3 anchor(Level world, BlockPos pos, Direction port) {
@@ -747,8 +748,23 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
         }
 
         public static @Nullable BeltData create(Level world, BlockPos start, Direction startFacing,
+                                                 BlockPos target, Direction targetFacing,
+                                                 List<Tuple<BlockPos, Direction>> midPoints, boolean validate) {
+            return create(world, start, startFacing, target, targetFacing, midPoints, validate, 0);
+        }
+
+        public static @Nullable BeltData create(Level world, BlockPos start, Direction startFacing,
+                                                 BlockPos target, Direction targetFacing,
+                                                 List<Tuple<BlockPos, Direction>> midPoints, boolean validate,
+                                                 double minimumAngleDegrees) {
+            return create(world, start, startFacing, target, targetFacing, midPoints, validate,
+                    SplineUtil.DEFAULT_MIN_TURN_RADIUS, minimumAngleDegrees);
+        }
+
+        public static @Nullable BeltData create(Level world, BlockPos start, Direction startFacing,
                                                 BlockPos target, Direction targetFacing,
-                                                List<Tuple<BlockPos, Direction>> midPoints, boolean validate) {
+                                                List<Tuple<BlockPos, Direction>> midPoints, boolean validate,
+                                                double minimumTurnRadius, double minimumAngleDegrees) {
             var conveyorStartDir = Vec3.atLowerCornerOf(startFacing.getNormal());
             var conveyorEndDir = Vec3.atLowerCornerOf(targetFacing.getOpposite().getNormal());
             var conveyorStartPointVisual = anchor(world, start, startFacing);
@@ -761,7 +777,8 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
             var segmentPoints = SplineUtil.getPointPairs(conveyorStartPointVisual, conveyorStartDir,
                     conveyorEndPointVisual, conveyorEndDir, transformedMidPoints);
             var arcPath = SplineUtil.ArcLengthPath.create(segmentPoints);
-            if (validate && !SplineUtil.isPathUsable(arcPath, conveyorStartDir, conveyorEndDir))
+            if (validate && !SplineUtil.isPathUsable(arcPath, conveyorStartDir, conveyorEndDir,
+                    minimumTurnRadius, minimumAngleDegrees))
                 return null;
             return new BeltData(segmentPoints, arcPath);
         }

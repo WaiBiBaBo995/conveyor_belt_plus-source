@@ -1,5 +1,12 @@
 # Changelog （English）
 
+## 3.7.1 — Support-aware belt validation and performance improvements (2026-10-02)
+
+- Reset `belt.minimum_angle` and `belt.minimum_turn_radius` at each explicitly selected conveyor support, so every endpoint-to-support section is validated independently instead of combining both sides of a support.
+- Keep the client projection and server placement checks consistent with the support-aware validation, while retaining basic path geometry and endpoint direction checks.
+- Optimize spline validation by caching segment boundaries and total path length, avoiding repeated list-front removal, and skipping full curvature sampling when the turn-radius limit is disabled.
+- Add regression coverage for supported multi-section slopes and document the new configuration behavior.
+
 ## 3.7.0 — Hand insertion and construction rollback (2026-09-30)
 
 - Keep the held belt and restore reserved interface items to their original slots when construction fails, including sharp turns and full inventories; do not spawn construction refunds as drops.
@@ -25,6 +32,13 @@
 - Expand GameTests for fluid capabilities, persistence, conservation, immutable components, tab security and optional RTS/Jade integration.
 
 # 更新日志 (中文)
+
+## 3.7.1 — 支架感知的传送带校验与性能优化（2026-10-02）
+
+- 在每个手动选择的传送带支架处重新计算 `belt.minimum_angle` 和 `belt.minimum_turn_radius`，使端点到支架之间的每个区段独立判断，不再合并支架两侧的路径。
+- 保持客户端传送带投影与服务器实际放置判断一致，同时继续保留基础路径几何和端点方向检查。
+- 优化曲线校验：缓存区段边界和路径总长度，避免反复删除列表头部元素；关闭最小转弯半径限制时跳过完整曲率采样。
+- 增加带支架多区段坡度的回归测试，并补充相关配置行为说明。
 
 ## 3.7.0 — 手持插入与建造回滚（2026-09-30）
 

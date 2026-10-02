@@ -40,6 +40,8 @@ public final class ConveyorConfigScreen extends Screen {
             values.add(ConveyorConfig.FLUID_AMOUNTS[tier]);
             values.add(ConveyorConfig.FLUID_FILTER_LIMITS[tier]);
         }
+        values.add(ConveyorConfig.MINIMUM_BELT_ANGLE);
+        values.add(ConveyorConfig.MINIMUM_BELT_TURN_RADIUS);
         int left = width / 2 - 155;
         addRenderableWidget(Button.builder(pageText(), button -> {
             fluidPage = !fluidPage;
@@ -48,11 +50,14 @@ public final class ConveyorConfigScreen extends Screen {
         }).bounds(left, 43, 112, 18).build());
         for (int i = 0; i < values.size(); i++) {
             var value = values.get(i);
-            int column = i < 10 ? i / 3 : (i - 10) / 2;
-            int row = i < 10 ? i % 3 : (i - 10) % 2;
-            var field = new EditBox(font, i == 9 ? left + 252 : left + 124 + column * 62, i == 9 ? 143 : 65 + row * 24, 56, 18,
+            int x = i < 9 ? left + 124 + (i / 3) * 62
+                    : i == 9 ? left + 252
+                    : i < 16 ? left + 124 + ((i - 10) / 2) * 62
+                    : left + (i == 16 ? 124 : 252);
+            int y = i < 9 ? 65 + (i % 3) * 24 : i < 16 ? 65 + ((i - 10) % 2) * 24 : i == 9 ? 143 : 167;
+            var field = new EditBox(font, x, y, 56, 18,
                     Component.translatable("config.conveyor_belt_plus." + String.join(".", value.getPath())));
-            String range = i >= 10 ? ((i - 10) % 2 == 0 ? "1–1048576" : "1–54")
+            String range = i == 16 ? "0–90" : i == 17 ? "0–64" : i >= 10 ? ((i - 10) % 2 == 0 ? "1–1048576" : "1–54")
                     : i == 9 ? "1–1048576" : i % 3 == 0 ? "0.1–64" : i % 3 == 2 ? "1–54" : "1–64";
             field.setTooltip(net.minecraft.client.gui.components.Tooltip.create(field.getMessage().copy().append(": " + range)));
             field.setMaxLength(20);
@@ -65,7 +70,7 @@ public final class ConveyorConfigScreen extends Screen {
         var toggle = addRenderableWidget(Button.builder(sideText(), button -> {
             extractionSides = !extractionSides;
             button.setMessage(sideText());
-        }).bounds(left, 174, 310, 20).build());
+        }).bounds(left, 198, 310, 20).build());
         toggle.active = editable;
         var save = addRenderableWidget(Button.builder(Component.translatable("config.conveyor_belt_plus.save"), button -> save())
                 .bounds(width / 2 - 155, height - 25, 150, 20).build());
@@ -81,7 +86,7 @@ public final class ConveyorConfigScreen extends Screen {
     private Component pageText() { return Component.translatable("screen.conveyor_belt_plus." + (fluidPage ? "tab_fluids" : "tab_items")); }
     private void updatePage() {
         for (int i = 0; i < fields.size(); i++) {
-            fields.get(i).visible = i == 9 || (i >= 10) == fluidPage;
+            fields.get(i).visible = i == 9 || i == 16 || i == 17 || (i >= 10 && i < 16) == fluidPage;
             if (!fields.get(i).visible) fields.get(i).setFocused(false);
         }
     }
@@ -94,11 +99,12 @@ public final class ConveyorConfigScreen extends Screen {
                 String text = fields.get(i).getValue().trim();
                 if (values.get(i) instanceof ForgeConfigSpec.DoubleValue) {
                     double value = Double.parseDouble(text);
-                    if (!Double.isFinite(value) || value < .1 || value > 64) throw new IllegalArgumentException();
+                    if (!Double.isFinite(value) || value < 0 || value > (i == 16 ? 90 : 64))
+                        throw new IllegalArgumentException();
                     parsed[i] = value;
                 } else {
                     int value = Integer.parseInt(text);
-                    int max = i >= 10 ? ((i - 10) % 2 == 0 ? 1048576 : ConveyorConfig.MAX_FILTER_RULES)
+                    int max = i >= 10 && i < 16 ? ((i - 10) % 2 == 0 ? 1048576 : ConveyorConfig.MAX_FILTER_RULES)
                             : i == 9 ? ConveyorConfig.MAX_SPLITTER_BUFFER : i % 3 == 2 ? ConveyorConfig.MAX_FILTER_RULES : 64;
                     if (value < 1 || value > max) throw new IllegalArgumentException();
                     parsed[i] = value;
@@ -132,6 +138,8 @@ public final class ConveyorConfigScreen extends Screen {
         for (int i = 0; i < labels.length; i++) context.drawString(font,
                 labels[i].isEmpty() ? Component.empty() : Component.translatable("config.conveyor_belt_plus.field." + labels[i]), width / 2 - 155,
                 i == 3 ? 148 : 70 + i * 24, 0xFFFFFF);
+        context.drawString(font, Component.translatable("config.conveyor_belt_plus.field.minimum_angle"), width / 2 - 155, 172, 0xFFFFFF);
+        context.drawString(font, Component.translatable("config.conveyor_belt_plus.field.minimum_turn_radius"), width / 2 + 30, 172, 0xFFFFFF);
         context.drawCenteredString(font, error, width / 2, height - 38, 0xFF7777);
         super.render(context, mouseX, mouseY, delta);
     }
