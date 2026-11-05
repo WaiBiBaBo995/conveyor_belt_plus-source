@@ -89,7 +89,7 @@ public final class BeltPickup {
             var item = iterator.next();
             if (item.id != id) continue;
             if (!validProgress(shown, item.progress, access.data.totalLength(), BeltTiers.speed(access.tier))) return NONE;
-            var point = SplineUtil.getPositionOnSpline(access.data, shown);
+            var point = pureneko.conveyor_belt_plus.util.BeltGeometry.cargoPoint(access.data, SplineUtil.getPositionOnSpline(access.data, shown));
             var hit = rayHit(bounds(point), eye, end);
             if (hit == null || !unobstructed(player, eye, hit)) return NONE;
             var hitPos = BlockPos.containing(hit);

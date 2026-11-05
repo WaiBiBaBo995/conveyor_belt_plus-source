@@ -28,6 +28,8 @@ public final class ConveyorBeltPlus {
         pureneko.conveyor_belt_plus.network.PickupNetworking.register();
         pureneko.conveyor_belt_plus.network.RtsNetworking.register();
         pureneko.conveyor_belt_plus.network.InsertionNetworking.register();
+        pureneko.conveyor_belt_plus.network.BeltUpgradeNetworking.register();
+        pureneko.conveyor_belt_plus.network.RtsActionNetworking.register();
         net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
                 () -> pureneko.conveyor_belt_plus.client.ConveyorBeltPlusClient::initialize);
     }

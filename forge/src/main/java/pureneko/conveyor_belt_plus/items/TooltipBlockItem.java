@@ -19,8 +19,7 @@ public class TooltipBlockItem extends BlockItem {
         var world = context.getLevel();
         if (player != null && player.isShiftKeyDown() && getBlock() instanceof ChuteBlock upgrade
                 && world.getBlockState(context.getClickedPos()).getBlock() instanceof ChuteBlock previous
-                && previous.getKind() == upgrade.getKind()
-                && pureneko.conveyor_belt_plus.util.TierUpgrade.isUpgrade(previous.getTier(), upgrade.getTier())) {
+                && pureneko.conveyor_belt_plus.blocks.UpgradeInteractions.canReplace(previous, upgrade)) {
             if (world.isClientSide) return net.minecraft.world.InteractionResult.SUCCESS;
             return pureneko.conveyor_belt_plus.blocks.UpgradeInteractions.chute(world, context.getClickedPos(),
                     player, context.getItemInHand(), upgrade) ? net.minecraft.world.InteractionResult.SUCCESS : net.minecraft.world.InteractionResult.FAIL;

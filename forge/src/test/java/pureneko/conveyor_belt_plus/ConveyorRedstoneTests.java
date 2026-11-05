@@ -33,7 +33,7 @@ public final class ConveyorRedstoneTests {
         var world = context.getLevel();
         var pos = context.absolutePos(new BlockPos(5, 2, 5));
         world.setBlockAndUpdate(pos.west(), Blocks.CHEST.defaultBlockState());
-        world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
+        world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
         var chute = (ChuteBlockEntity) world.getBlockEntity(pos);
         var chest = (ChestBlockEntity) world.getBlockEntity(pos.west());
         var batch = new ItemStack(Items.IRON_INGOT, 64);
@@ -91,8 +91,8 @@ public final class ConveyorRedstoneTests {
             world.setBlockAndUpdate(pos.west(), Blocks.CHEST.defaultBlockState());
             var chest = (ChestBlockEntity) world.getBlockEntity(pos.west());
             for (int i = 0; i < 8; i++) chest.setItem(i, new ItemStack(Items.GOLD_INGOT, 64));
-            world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-            world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+            world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+            world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
             var chute = (ChuteBlockEntity) world.getBlockEntity(pos);
             context.assertTrue(chute.connectOutgoing(Direction.EAST, target, Direction.WEST, java.util.List.of(), 1), "test belt");
             chute.setRedstoneMode(Mode.NEVER);
@@ -133,7 +133,7 @@ public final class ConveyorRedstoneTests {
         splitter.connectIncoming(Direction.WEST, pos.west(5));
         for (var direction : new Direction[]{Direction.EAST, Direction.NORTH, Direction.SOUTH}) {
             var end = pos.relative(direction, 6);
-            world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, direction.getOpposite()));
+            world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, direction.getOpposite()));
             context.assertTrue(splitter.connectOutgoing(direction, end, direction.getOpposite(), java.util.List.of(), 1), "splitter route " + direction);
         }
         fill(splitter, Direction.EAST);

@@ -57,8 +57,8 @@ public final class ConveyorRtsIntegrationTests {
             for (int line = 0; line < 2; line++) {
                 var start = ctx.absolutePos(new BlockPos(2, 2, 3 + line * 6));
                 var end = ctx.absolutePos(new BlockPos(12, 2, 3 + line * 6));
-                world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-                world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+                world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.EAST));
+                world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.WEST));
                 ChestBlockEntity chest = null;
                 if (line == 1) {
                     var storagePos = ctx.absolutePos(new BlockPos(7, 2, 13));
@@ -100,8 +100,8 @@ public final class ConveyorRtsIntegrationTests {
             var end = ctx.absolutePos(new BlockPos(12, 2, 5));
             var playerPos = ctx.absolutePos(new BlockPos(7, 2, 13)).getCenter();
             player.setPosRaw(playerPos.x, playerPos.y, playerPos.z);
-            world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-            world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+            world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.EAST));
+            world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.WEST));
             var chute = (ChuteBlockEntity) world.getBlockEntity(start);
             ctx.assertTrue(chute.connectOutgoing(Direction.EAST, end, Direction.WEST, java.util.List.of(), 1), "pickup route");
             var nbt = chute.saveWithFullMetadata();
@@ -161,8 +161,8 @@ public final class ConveyorRtsIntegrationTests {
             var start = ctx.absolutePos(new BlockPos(2, 2, 5));
             var end = ctx.absolutePos(new BlockPos(12, 2, 5));
             player.setPos(ctx.absolutePos(new BlockPos(7, 2, 13)).getCenter());
-            ctx.getLevel().setBlockAndUpdate(start, BlockContent.FLUID_CHUTE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-            ctx.getLevel().setBlockAndUpdate(end, BlockContent.FLUID_CHUTE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+            ctx.getLevel().setBlockAndUpdate(start, BlockContent.FLUID_CHUTE.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.EAST));
+            ctx.getLevel().setBlockAndUpdate(end, BlockContent.FLUID_CHUTE.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.WEST));
             var chute = (ChuteBlockEntity) ctx.getLevel().getBlockEntity(start);
             ctx.assertTrue(chute.connectOutgoing(Direction.EAST, end, Direction.WEST, java.util.List.of(), 1), "RTS fluid route");
             var parcel = pureneko.conveyor_belt_plus.util.FluidPackets.create(
@@ -213,8 +213,8 @@ public final class ConveyorRtsIntegrationTests {
             player.setPos(ctx.absolutePos(new BlockPos(7, 2, 13)).getCenter());
             var start = ctx.absolutePos(new BlockPos(2, 2, 5));
             var end = start.east(10);
-            world.setBlockAndUpdate(start, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-            world.setBlockAndUpdate(end, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+            world.setBlockAndUpdate(start, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.EAST));
+            world.setBlockAndUpdate(end, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.WEST));
             var chute = (ChuteBlockEntity) world.getBlockEntity(start);
             ctx.assertTrue(chute.connectOutgoing(Direction.EAST, end, Direction.WEST, java.util.List.of(), 1), "RTS insertion route");
             RtsCameraManager.start(player, true);
@@ -244,7 +244,10 @@ public final class ConveyorRtsIntegrationTests {
                     new net.minecraftforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, 64000));
             chest.setItem(2, packet.copy());
             var fluidRay = SplineUtil.getPositionOnSpline(chute.getBeltData(), .25f).subtract(eye).normalize();
-            ctx.assertTrue(BeltInsertion.putRemote(player, start, Direction.EAST, eye, fluidRay, packet), "RTS storage fluid_packet enters fluid transport");
+            var insertedFluid=BeltInsertion.putRemote(player, start, Direction.EAST, eye, fluidRay, packet);
+            ctx.assertTrue(insertedFluid, "RTS storage fluid_packet enters fluid transport; ray="+RtsCompat.validRay(player,eye,fluidRay)
+                    +" target="+BeltInsertion.locate(player,start,Direction.EAST,eye,eye.add(fluidRay.scale(128)))
+                    +" allowed="+RtsCompat.canTake(player,start,packet)+" stored="+chest.getItem(2));
             ctx.assertTrue(chest.getItem(2).isEmpty()
                     && pureneko.conveyor_belt_plus.util.FluidPackets.amount(chute.pickupAccess(Direction.EAST).items().getFirst().stack) == 64000,
                     "RTS fluid packet conserves every mB");
@@ -254,7 +257,7 @@ public final class ConveyorRtsIntegrationTests {
             ctx.assertTrue(player.getMainHandItem().isEmpty() && chute.pickupAccess(Direction.EAST).items().getLast().stack.getCount() == 7, "RTS held stack consumed exactly once");
             var badStart = start.south(4);
             var badEnd = badStart.east(10);
-            world.setBlockAndUpdate(badStart, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+            world.setBlockAndUpdate(badStart, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(ChuteBlock.FACING, Direction.WEST));
             world.setBlockAndUpdate(badEnd.east(), Blocks.STONE.defaultBlockState());
             chest.setItem(3, new ItemStack(ItemContent.ADVANCED_BELT.get(), 2));
             player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.STICK, 7));
@@ -282,5 +285,101 @@ public final class ConveyorRtsIntegrationTests {
         RtsAPI.get().interaction().interactTarget(player, -1, pos, face, hit.x, hit.y, hit.z,
                 com.rtsbuilding.rtsbuilding.network.builder.C2SRtsInteractPayload.SOURCE_PIN_ITEM,
                 (byte) 0, "conveyor_belt_plus:advanced_belt", eye.x, eye.y, eye.z, ray.x, ray.y, ray.z);
+    }
+
+    @GameTest(template="empty", templateNamespace=ConveyorBeltPlus.MOD_ID, timeoutTicks=200)
+    public static void rtsBodyUpgradeAndUniversalRefund(GameTestHelper ctx) {
+        var world=ctx.getLevel();boolean progression=Config.ENABLE_SURVIVAL_PROGRESSION.get();
+        var player=new net.minecraftforge.common.util.FakePlayer(world,new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(),"ConveyorRTSUpgrade"));
+        try {
+            Config.ENABLE_SURVIVAL_PROGRESSION.set(false);player.setGameMode(GameType.SURVIVAL);
+            var start=ctx.absolutePos(new BlockPos(2,2,3));var end=start.east(10);
+            world.setBlockAndUpdate(start,BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(ChuteBlock.FACING,Direction.EAST));
+            world.setBlockAndUpdate(end,BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(ChuteBlock.FACING,Direction.WEST));
+            var source=(ChuteBlockEntity)world.getBlockEntity(start);
+            ctx.assertTrue(source.connectOutgoing(Direction.EAST,end,Direction.WEST,java.util.List.of(),1),"RTS upgrade route");
+            var parcel=new ChuteBlockEntity.BeltItem(.5f,732,new ItemStack(Items.DIAMOND,9));source.pickupAccess(Direction.EAST).items().add(parcel);
+            var storagePos=ctx.absolutePos(new BlockPos(7,2,13));world.setBlockAndUpdate(storagePos,Blocks.CHEST.defaultBlockState());
+            var storage=(ChestBlockEntity)world.getBlockEntity(storagePos);
+            storage.setItem(0,new ItemStack(ItemContent.ADVANCED_BELT.get(),2));storage.setItem(1,new ItemStack(ItemContent.UNIVERSAL_CHUTE.get(),2));
+            player.setPosRaw(storagePos.getX()+.5,storagePos.getY()+1,storagePos.getZ()+.5);
+            player.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.STICK,7));
+            RtsCameraManager.start(player,true);
+            var api=RtsAPI.get();api.bindings().setBdNetworkEnabled(player,false);api.bindings().linkStorage(player,storagePos,(byte)0);
+            var eye=RtsCameraManager.getCameraPosition(player);var point=SplineUtil.getPositionOnSpline(source.getBeltData(),.5);
+            var direction=point.subtract(eye).normalize();
+            ctx.assertFalse(pureneko.conveyor_belt_plus.compat.rts.RtsActions.use(player,start,Direction.EAST,eye.add(10,0,0),direction,Vec3.ZERO,
+                    new ItemStack(ItemContent.ADVANCED_BELT.get()),true,true,true),"forged RTS camera cannot upgrade");
+            ctx.assertTrue(pureneko.conveyor_belt_plus.compat.rts.RtsActions.use(player,start,Direction.EAST,eye,direction,Vec3.ZERO,
+                    new ItemStack(ItemContent.ADVANCED_BELT.get()),true,true,true),"actual selected warehouse belt upgrades body");
+            ctx.assertTrue(source.getBeltTier()==2 && parcel.progress==.5f && parcel.stack.getCount()==9,"remote upgrade preserves cargo");
+            ctx.assertTrue(storage.countItem(ItemContent.ADVANCED_BELT.get())==1 && storage.countItem(ItemContent.BELT.get())==1,"consume new belt and refund old to warehouse");
+            var attachment=start.getCenter().add(-.5,.125,0);
+            var toward=attachment.subtract(eye).normalize();
+            var blockRay=world.clip(new net.minecraft.world.level.ClipContext(eye,attachment.add(toward.scale(.3)),
+                    net.minecraft.world.level.ClipContext.Block.OUTLINE,net.minecraft.world.level.ClipContext.Fluid.NONE,player));
+            ctx.assertTrue(blockRay.getType()==net.minecraft.world.phys.HitResult.Type.BLOCK && blockRay.getBlockPos().equals(start),
+                    "fixture ray hits interface, actual="+blockRay.getBlockPos()+" expected="+start);
+            var face=blockRay.getDirection();var target=blockRay.getLocation();
+            direction=target.subtract(eye).normalize();
+            ctx.assertTrue(pureneko.conveyor_belt_plus.compat.rts.RtsActions.use(player,start,face,eye,direction,target,
+                    new ItemStack(ItemContent.UNIVERSAL_CHUTE.get()),true,false,true),"selected universal interface replaces existing one remotely");
+            var replaced=(ChuteBlockEntity)world.getBlockEntity(start);
+            ctx.assertTrue(replaced.getKind()==ChuteKind.UNIVERSAL && replaced.getBeltTier()==2 && end.equals(replaced.getTarget()),"remote replacement retains route and belt tier");
+            ctx.assertTrue(storage.countItem(ItemContent.UNIVERSAL_CHUTE.get())==1 && storage.countItem(ItemContent.CHUTE.get())==1,"interface refunded to warehouse");
+            ctx.assertTrue(player.getMainHandItem().is(Items.STICK) && player.getMainHandItem().getCount()==7 && !player.isShiftKeyDown(),"temporary main hand and Shift restored");
+            // A full warehouse must fall back into an empty real hand slot, without losing the refund when the temporary hand is restored.
+            for(int slot=0;slot<storage.getContainerSize();slot++)storage.setItem(slot,new ItemStack(Items.COBBLESTONE,64));
+            storage.setItem(0,new ItemStack(ItemContent.ULTIMATE_BELT.get(),2));
+            for(int slot=0;slot<player.getInventory().items.size();slot++)player.getInventory().setItem(slot,new ItemStack(Items.STONE,64));
+            player.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY);
+            direction=point.subtract(eye).normalize();
+            ctx.assertTrue(pureneko.conveyor_belt_plus.compat.rts.RtsActions.use(player,start,Direction.EAST,eye,direction,Vec3.ZERO,
+                    new ItemStack(ItemContent.ULTIMATE_BELT.get()),true,true,true),"selected belt upgrades with full linked storage");
+            ctx.assertTrue(player.getMainHandItem().is(ItemContent.ADVANCED_BELT.get()) && player.getMainHandItem().getCount()==1,
+                    "fallback refund survives temporary empty-hand restoration");
+            ctx.assertTrue(storage.countItem(ItemContent.ULTIMATE_BELT.get())==1,"fallback consumes exactly one actual material");
+            ctx.succeed();
+        } finally {RtsBeltDrafts.reset(player);RtsCameraManager.stopIfActive(player);Config.ENABLE_SURVIVAL_PROGRESSION.set(progression);}
+    }
+
+    @GameTest(template="empty", templateNamespace=ConveyorBeltPlus.MOD_ID)
+    public static void rtsShiftVerticalConstruction(GameTestHelper ctx) {
+        var world=ctx.getLevel();boolean progression=Config.ENABLE_SURVIVAL_PROGRESSION.get();
+        var player=new net.minecraftforge.common.util.FakePlayer(world,new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(),"ConveyorRTSLift"));
+        try {
+            Config.ENABLE_SURVIVAL_PROGRESSION.set(false);player.setGameMode(GameType.SURVIVAL);
+            var bottom=ctx.absolutePos(new BlockPos(5,1,5));var top=bottom.above(4);
+            world.setBlockAndUpdate(bottom,Blocks.CHEST.defaultBlockState());
+            world.setBlockAndUpdate(top,Blocks.CHEST.defaultBlockState());
+            var storagePos=ctx.absolutePos(new BlockPos(12,1,12));world.setBlockAndUpdate(storagePos,Blocks.CHEST.defaultBlockState());
+            var chest=(ChestBlockEntity)world.getBlockEntity(storagePos);
+            chest.setItem(0,new ItemStack(ItemContent.ADVANCED_BELT.get(),2));
+            player.getInventory().setItem(12,new ItemStack(ItemContent.CHUTE.get(),2));
+            player.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(Items.STICK,7));
+            var standing=ctx.absolutePos(new BlockPos(9,2,9)).getCenter();player.setPosRaw(standing.x,standing.y,standing.z);
+            RtsCameraManager.start(player,true);
+            var api=RtsAPI.get();api.bindings().setBdNetworkEnabled(player,false);api.bindings().linkStorage(player,storagePos,(byte)0);
+            var eye=RtsCameraManager.getCameraPosition(player);
+            for(var container:new BlockPos[]{bottom,top}) {
+                var target=container.getCenter().add(0,container.equals(bottom)?.375:-.5,0);
+                var direction=target.subtract(eye).normalize();
+                var ray=world.clip(new net.minecraft.world.level.ClipContext(eye,target.add(direction.scale(.02)),
+                    net.minecraft.world.level.ClipContext.Block.OUTLINE,net.minecraft.world.level.ClipContext.Fluid.NONE,player));
+                ctx.assertTrue(ray.getType()==net.minecraft.world.phys.HitResult.Type.BLOCK && ray.getBlockPos().equals(container),"real camera sees selected container face");
+                ctx.assertTrue(pureneko.conveyor_belt_plus.compat.rts.RtsActions.use(player,container,ray.getDirection(),eye,direction,ray.getLocation(),
+                    new ItemStack(ItemContent.ADVANCED_BELT.get()),true,false,true),"explicit RTS Shift selects a vertical endpoint");
+            }
+            var source=(ChuteBlockEntity)world.getBlockEntity(bottom.above());
+            var destination=(ChuteBlockEntity)world.getBlockEntity(top.below());
+            ctx.assertTrue(source!=null && destination!=null && source.getOwnFacing()==Direction.UP && destination.getOwnFacing()==Direction.DOWN,
+                "RTS builds mirrored vertical endpoints with Shift");
+            ctx.assertTrue(top.below().equals(source.getTarget()) && source.getBeltData().isVertical(),"RTS draft joins the selected vertical route");
+            ctx.assertTrue(chest.countItem(ItemContent.ADVANCED_BELT.get())==1 && player.getInventory().countItem(ItemContent.CHUTE.get())==0,
+                "one selected warehouse belt and two real interfaces consumed");
+            ctx.assertTrue(player.getMainHandItem().is(Items.STICK) && player.getMainHandItem().getCount()==7 && !player.isShiftKeyDown(),
+                "real hand and modifier restored after both endpoint actions");
+            ctx.succeed();
+        } finally {RtsBeltDrafts.reset(player);RtsCameraManager.stopIfActive(player);Config.ENABLE_SURVIVAL_PROGRESSION.set(progression);}
     }
 }

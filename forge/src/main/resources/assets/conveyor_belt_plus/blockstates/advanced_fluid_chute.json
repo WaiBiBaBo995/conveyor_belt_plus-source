@@ -14,6 +14,12 @@
     "facing=west": {
       "model": "conveyor_belt_plus:block/advanced_fluid_chute",
       "y": 270
+    },
+    "facing=up": {
+      "model": "conveyor_belt_plus:block/advanced_fluid_chute_up"
+    },
+    "facing=down": {
+      "model": "conveyor_belt_plus:block/advanced_fluid_chute_down"
     }
   }
 }

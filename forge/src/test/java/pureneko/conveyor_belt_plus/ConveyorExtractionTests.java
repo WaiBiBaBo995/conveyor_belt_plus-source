@@ -146,7 +146,7 @@ public final class ConveyorExtractionTests {
             ConveyorConfig.CHUTE_EXTRACTION_SIDES.set(true);
             var world = context.getLevel();
             var pos = context.absolutePos(new BlockPos(5, 2, 5));
-            world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+            world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
             var chute = (ChuteBlockEntity) world.getBlockEntity(pos);
             var legacy = chute.saveWithFullMetadata();
             legacy.remove("extractionSides");
@@ -211,8 +211,8 @@ public final class ConveyorExtractionTests {
         var world = context.getLevel();
         var pos = context.absolutePos(new BlockPos(3, 2, z));
         var target = pos.east(8);
-        world.setBlockAndUpdate(pos, block.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(pos, block.defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
         var chute = (ChuteBlockEntity) world.getBlockEntity(pos);
         context.assertTrue(chute.connectOutgoing(Direction.EAST, target, Direction.WEST, java.util.List.of(), 1), "test belt created");
         return chute;

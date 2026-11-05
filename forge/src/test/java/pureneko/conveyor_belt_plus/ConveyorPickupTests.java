@@ -53,9 +53,9 @@ public final class ConveyorPickupTests {
         context.assertTrue(ItemContent.ADVANCED_CHUTE.get().useOn(use).consumesAction(), "sneaking item path upgrades even when vanilla bypasses block use");
         context.assertTrue(world.getBlockState(pos).is(BlockContent.ADVANCED_CHUTE.get()) && player.getMainHandItem().getCount() == 1, "one upgrade and consumption");
         var target = context.absolutePos(new BlockPos(2, 2, 12));
-        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.NORTH));
+        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.NORTH));
         // Use a south-facing source for a straight test route.
-        world.setBlockAndUpdate(pos, BlockContent.ADVANCED_CHUTE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        world.setBlockAndUpdate(pos, BlockContent.ADVANCED_CHUTE.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.SOUTH));
         var chute = (ChuteBlockEntity) world.getBlockEntity(pos);
         context.assertTrue(chute.connectOutgoing(Direction.SOUTH, target, Direction.NORTH, java.util.List.of(), 1), "belt exists");
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ItemContent.ULTIMATE_BELT.get(), 2));
@@ -104,8 +104,8 @@ public final class ConveyorPickupTests {
         var world = context.getLevel();
         var pos = context.absolutePos(new BlockPos(2, 2, 5));
         var target = context.absolutePos(new BlockPos(12, 2, 5));
-        world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(pos, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
         var chute = (ChuteBlockEntity) world.getBlockEntity(pos);
         context.assertTrue(chute.connectOutgoing(Direction.EAST, target, Direction.WEST, java.util.List.of(), 1), "pickup route exists");
         var original = new ItemStack(Items.IRON_INGOT, 128);
@@ -174,7 +174,7 @@ public final class ConveyorPickupTests {
         var pos = context.absolutePos(new BlockPos(2, 2, 5));
         var target = context.absolutePos(new BlockPos(12, 2, 5));
         world.setBlockAndUpdate(pos, BlockContent.SPLITTER.get().defaultBlockState());
-        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
         var splitter = (ConveyorSplitterBlockEntity) world.getBlockEntity(pos);
         splitter.connectIncoming(Direction.WEST, pos.west());
         context.assertTrue(splitter.connectOutgoing(Direction.EAST, target, Direction.WEST, java.util.List.of(), 1), "splitter pickup route");

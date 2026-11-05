@@ -83,6 +83,7 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
     // client only data, used for rendering
     public BeltQuad[] renderedModel;
 
+    private boolean urgentBeltSync;
     private boolean networkDirty = false;
 
     public ChuteBlockEntity(BlockPos pos, BlockState state) {
@@ -108,6 +109,19 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
         if (target == null || target.equals(BlockPos.ZERO)) {
             if (!world.isClientSide && !movingItems.isEmpty()) {
                 dropContent(world, pos);
+            }
+            return;
+        }
+
+        if (!world.hasChunkAt(target) || midPoints.stream().anyMatch(point -> !world.hasChunkAt(point))) {
+            if (!world.isClientSide) {
+                boolean wasMoving = visualState.step(world.getGameTime() - 1) > 0;
+                visualState.advance(0, world.getGameTime());
+                networkDirty |= wasMoving;
+                if (networkDirty && world instanceof ServerLevel server) {
+                    server.getChunkSource().blockChanged(pos);
+                    networkDirty = false;
+                }
             }
             return;
         }
@@ -138,7 +152,8 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
         if (world.getGameTime() % 19 == 0)
             assignTargetState(world);
 
-        if (networkDirty) {
+        if (networkDirty && (urgentBeltSync || Math.floorMod(world.getGameTime() + pos.asLong(), 2) == 0)) {
+            urgentBeltSync = false;
             syncToClients();
             networkDirty = false;
         }
@@ -184,8 +199,12 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
     }
 
     private void moveItemsOnBelt() {
+        int previousSize = movingItems.size();
+        boolean previouslyMoving = visualState.step(level.getGameTime() - 1) > 0;
         var step = BeltTransport.tickWithMotion(movingItems, beltData.totalLength(), BeltTiers.speed(beltTier),
                 packet -> ConveyorNodeUtil.accept(level, target, targetFacing, packet.stack));
+        urgentBeltSync |= previousSize != movingItems.size() || previouslyMoving != (step.distanceMoved() > 0)
+                || step.changed() && step.distanceMoved() == 0;
         visualState.advance(step.distanceMoved(), level.getGameTime());
         if (step.changed()) {
             networkDirty = true;
@@ -239,6 +258,7 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
             if (!extracted.isEmpty()) {
                 config.nextSide = (index + 1) % 6;
                 movingItems.addFirst(new BeltItem(nextItemId++, extracted));
+                urgentBeltSync = true;
                 config.redstone.transferred();
                 setChanged();
                 networkDirty = true;
@@ -465,7 +485,7 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
     }
 
     public Direction getOwnFacing() {
-        return getBlockState().getValue(HorizontalDirectionalBlock.FACING);
+        return getBlockState().getValue(ChuteBlock.FACING);
     }
 
     @Override
@@ -581,7 +601,8 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
 
     public boolean isUsed() {
         var usedAsTarget = level != null && !sourceBeltPos.equals(BlockPos.ZERO)
-                && level.getGameTime() >= lastTargetedTime && level.getGameTime() - lastTargetedTime < 40;
+                && (!level.hasChunkAt(sourceBeltPos)
+                || level.getGameTime() >= lastTargetedTime && level.getGameTime() - lastTargetedTime < 40);
         var usedAsSource = target != null && !target.equals(BlockPos.ZERO);
         return usedAsTarget || usedAsSource;
     }
@@ -717,6 +738,10 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
 
         public List<Tuple<Vec3, Vec3>> allPoints() { return allPoints; }
         public double totalLength() { return arcPath.length(); }
+        public boolean isVertical() {
+            return allPoints.size() == 2 && Math.abs(allPoints.get(0).getB().y) > .999
+                    && Math.abs(allPoints.get(1).getB().y) > .999;
+        }
         private pureneko.conveyor_belt_plus.util.BeltHitPath interactionPath;
         public pureneko.conveyor_belt_plus.util.BeltHitPath interactionPath() {
             if (interactionPath == null) interactionPath = new pureneko.conveyor_belt_plus.util.BeltHitPath(this);
@@ -744,7 +769,8 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
             if (world.getBlockEntity(pos) instanceof ConveyorSplitterBlockEntity
                     || world.getBlockState(pos).is(BlockContent.CONVEYOR_SUPPORT_BLOCK.get()))
                 return pos.getCenter();
-            return pos.getCenter().subtract(Vec3.atLowerCornerOf(port.getNormal()).scale(0.5));
+            // Rotate the horizontal interface connection plane with the model, including vertical endpoints.
+            return pos.getCenter().subtract(Vec3.atLowerCornerOf(port.getNormal()).scale(.5));
         }
 
         public static @Nullable BeltData create(Level world, BlockPos start, Direction startFacing,
@@ -765,6 +791,13 @@ public class ChuteBlockEntity extends BlockEntity implements BlockEntityTicker<C
                                                 BlockPos target, Direction targetFacing,
                                                 List<Tuple<BlockPos, Direction>> midPoints, boolean validate,
                                                 double minimumTurnRadius, double minimumAngleDegrees) {
+            // Vertical endpoints form one straight lift. Turns use separate interfaces on a shared container.
+            if (startFacing.getAxis().isVertical() || targetFacing.getAxis().isVertical()) {
+                int rise = Integer.compare(target.getY(), start.getY());
+                if (start.getX() != target.getX() || start.getZ() != target.getZ() || rise == 0
+                        || !midPoints.isEmpty() || startFacing != (rise > 0 ? Direction.UP : Direction.DOWN)
+                        || targetFacing != startFacing.getOpposite()) return null;
+            }
             var conveyorStartDir = Vec3.atLowerCornerOf(startFacing.getNormal());
             var conveyorEndDir = Vec3.atLowerCornerOf(targetFacing.getOpposite().getNormal());
             var conveyorStartPointVisual = anchor(world, start, startFacing);

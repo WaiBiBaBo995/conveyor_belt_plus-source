@@ -34,6 +34,15 @@ import java.util.ArrayList;
 public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> {
 
     private static final Vec3 UNIT_X = new Vec3(1, 0, 0);
+    private static final Vec3 UP = new Vec3(0, 1, 0);
+    private static final net.minecraft.world.level.block.state.BlockState TRAY = net.minecraft.world.level.block.Blocks.SMOOTH_STONE_SLAB.defaultBlockState();
+    private static final java.util.Map<BakedModel, Boolean> FLAT_MODELS = new java.util.IdentityHashMap<>();
+
+    /** A vertical tangent has no cross product with world-up; use a stable east/west width. */
+    private static Vec3 right(Vec3 direction) {
+        var result = direction.cross(UP);
+        return result.lengthSqr() < 1e-10 ? UNIT_X : result.normalize();
+    }
 
     private static final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap lightmapCache = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
     private static net.minecraft.world.level.Level lightmapWorld;
@@ -42,6 +51,7 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
 
     public static void clearLightingCache() {
         lightmapCache.clear();
+        FLAT_MODELS.clear();
         lightmapWorld = null;
         lightmapTick = Long.MIN_VALUE;
     }
@@ -83,7 +93,7 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
         if (entity.renderedModel == null)
             entity.renderedModel = createSplineModel(beltData, entity.getBlockPos());
         BeltMeshRenderer.draw(entity.getLevel(), entity.renderedModel, matrices, vertexConsumers,
-                entity.getBeltTier(), frame, overlay, CommonColors.WHITE, false);
+                entity.getBeltTier(), frame, overlay, CommonColors.WHITE, false, beltData.isVertical());
 
         // render items
         renderItems(entity, entity.getOwnFacing(), entity.getMovingItems(), matrices, vertexConsumers, overlay, beltData, itemRenderDistSq, presentationTick);
@@ -105,10 +115,11 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
         var conveyorStartDir = beltData.allPoints().get(0).getB();
         var conveyorEndDir = beltData.allPoints().get(beltData.allPoints().size() - 1).getB();
 
-        var beginRight = conveyorStartDir.cross(new Vec3(0, 1, 0)).normalize();
+        var beginRight = right(conveyorStartDir);
 
         // local space
         var localStart = beltData.allPoints().get(0).getA().subtract(Vec3.atLowerCornerOf(origin));
+        localStart = pureneko.conveyor_belt_plus.util.BeltGeometry.surfacePoint(beltData, localStart);
         var lastRight = localStart.add(beginRight.scale(lineWidth));
         var lastLeft = localStart.add(beginRight.scale(-lineWidth));
 
@@ -119,15 +130,17 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
             var nextProgress = (i + 1) / (float) segmentCount;
             var worldPoint = SplineUtil.getPositionOnSpline(beltData, progress);
             var localPoint = worldPoint.subtract(origin.getCenter());
+            localPoint = pureneko.conveyor_belt_plus.util.BeltGeometry.surfacePoint(beltData, localPoint);
             var worldPointNext = SplineUtil.getPositionOnSpline(beltData, nextProgress);
             var localPointNext = worldPointNext.subtract(origin.getCenter());
+            localPointNext = pureneko.conveyor_belt_plus.util.BeltGeometry.surfacePoint(beltData, localPointNext);
 
             var worldPos = BlockPos.containing(worldPointNext.add(0.5f, 0, 0.5f));
 
             var direction = localPointNext.subtract(localPoint);
-            var cross = direction.cross(new Vec3(0, 1, 0)).normalize();
+            var cross = right(direction);
             if (last)
-                cross = conveyorEndDir.cross(new Vec3(0, 1, 0)).normalize();
+                cross = right(conveyorEndDir);
 
             var nextRight = localPointNext.add(cross.scale(lineWidth)).add(0.5f, 0.5f, 0.5f);
             var nextLeft = localPointNext.add(cross.scale(-lineWidth)).add(0.5f, 0.5f, 0.5f);
@@ -143,15 +156,15 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
                 var localPointMid = worldPointMid.subtract(origin.getCenter());
 
                 var directionMid = localPointMid.subtract(localPoint);
-                var crossMid = directionMid.cross(new Vec3(0, 1, 0)).normalize();
+                var crossMid = right(directionMid);
 
                 var midRight = localPointMid.add(crossMid.scale(lineWidth)).add(0.5f, 0.5f, 0.5f);
                 var midLeft = localPointMid.add(crossMid.scale(-lineWidth)).add(0.5f, 0.5f, 0.5f);
 
                 direction = localPointNext.subtract(localPointMid);
-                cross = direction.cross(new Vec3(0, 1, 0)).normalize();
+                cross = right(direction);
                 if (last)
-                    cross = conveyorEndDir.cross(new Vec3(0, 1, 0)).normalize();
+                    cross = right(conveyorEndDir);
 
                 nextRight = localPointNext.add(cross.scale(lineWidth)).add(0.5f, 0.5f, 0.5f);
                 nextLeft = localPointNext.add(cross.scale(-lineWidth)).add(0.5f, 0.5f, 0.5f);
@@ -173,6 +186,10 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
     private static void addSegmentVertices(Vec3 nextRight, Vec3 lastRight, Vec3 nextLeft, Vec3 lastLeft, BlockPos worldPos, ArrayList<BeltQuad> result, float vStart, float vEnd) {
 
         var skirtHeight = 0.15f;
+        var tangent = nextRight.subtract(lastRight);
+        var normal = tangent.cross(lastLeft.subtract(lastRight)).normalize();
+        if (Math.abs(tangent.normalize().y) > .999) normal = new Vec3(0, 0, 1);
+        var skirt = normal.scale(-skirtHeight);
 
         // top quad
         var uMin = 0f;
@@ -194,10 +211,10 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
         vMin = vStart;
         vMax = vEnd;
 
-        topRight = BeltVertex.create(nextRight.add(0, -skirtHeight, 0), uMax, vMax);
+        topRight = BeltVertex.create(nextRight.add(skirt), uMax, vMax);
         topLeft = BeltVertex.create(nextRight, uMin, vMax);
         botLeft = BeltVertex.create(lastRight, uMin, vMin);
-        botRight = BeltVertex.create(lastRight.add(0, -skirtHeight, 0), uMax, vMin);
+        botRight = BeltVertex.create(lastRight.add(skirt), uMax, vMin);
 
         quad = new BeltQuad(topRight, topLeft, botLeft, botRight, worldPos);
         result.add(quad);
@@ -208,10 +225,10 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
         vMin = vStart;
         vMax = vEnd;
 
-        topRight = BeltVertex.create(nextLeft.add(0, -skirtHeight, 0), uMax, vMax);
+        topRight = BeltVertex.create(nextLeft.add(skirt), uMax, vMax);
         topLeft = BeltVertex.create(nextLeft, uMin, vMax);
         botLeft = BeltVertex.create(lastLeft, uMin, vMin);
-        botRight = BeltVertex.create(lastLeft.add(0, -skirtHeight, 0), uMax, vMin);
+        botRight = BeltVertex.create(lastLeft.add(skirt), uMax, vMin);
 
         quad = new BeltQuad(botRight, botLeft, topLeft, topRight, worldPos);
         result.add(quad);
@@ -222,105 +239,81 @@ public class ChuteBeltRenderer implements BlockEntityRenderer<ChuteBlockEntity> 
         vMin = vStart;
         vMax = vEnd;
 
-        botRight = BeltVertex.create(lastRight.add(0, -skirtHeight, 0), uMin, vMin);
-        topRight = BeltVertex.create(nextRight.add(0, -skirtHeight, 0), uMin, vMax);
-        topLeft = BeltVertex.create(nextLeft.add(0, -skirtHeight, 0), uMax, vMax);
-        botLeft = BeltVertex.create(lastLeft.add(0, -skirtHeight, 0), uMax, vMin);
+        botRight = BeltVertex.create(lastRight.add(skirt), uMin, vMin);
+        topRight = BeltVertex.create(nextRight.add(skirt), uMin, vMax);
+        topLeft = BeltVertex.create(nextLeft.add(skirt), uMax, vMax);
+        botLeft = BeltVertex.create(lastLeft.add(skirt), uMax, vMin);
 
         quad = new BeltQuad(botRight, botLeft, topLeft, topRight, worldPos);
         result.add(quad);
     }
 
-    public static void renderItems(BlockEntity entity, Direction output, Iterable<ChuteBlockEntity.BeltItem> renderedItems, PoseStack matrices, MultiBufferSource vertexConsumers, int overlay, ChuteBlockEntity.BeltData beltData, int itemRenderDistSq, double presentationTick) {
-        pureneko.conveyor_belt_plus.client.BeltPickupTarget.considerRoute(entity, output, beltData);
+    public static void renderItems(BlockEntity entity, Direction output, Iterable<ChuteBlockEntity.BeltItem> items,
+                                   PoseStack matrices, MultiBufferSource consumers, int overlay, BeltData data,
+                                   int maxDistance, double presentationTick) {
+        BeltPickupTarget.considerRoute(entity, output, data);
         var client = Minecraft.getInstance();
-        var cam = client.getCameraEntity();
-        if (cam == null) return;
-        var camPos = cam.position();
-        var camLookDir = cam.getLookAngle();
-        var itemRenderer = client.getItemRenderer();
+        var camera = client.getCameraEntity();
+        if (camera == null) return;
+        var position = camera.position();
+        var look = camera.getLookAngle();
+        for (var packet : items) {
+            if (!packet.visible(presentationTick)) continue;
+            float progress = packet.renderedProgress(presentationTick);
+            var point = pureneko.conveyor_belt_plus.util.BeltGeometry.cargoPoint(data, SplineUtil.getPositionOnSpline(data, progress));
+            double distance = position.distanceToSqr(point);
+            if (distance > maxDistance || distance > 1 && look.dot(point.subtract(position)) < 0) continue;
+            BeltPickupTarget.consider(entity, output, packet, progress, point, data);
+            renderPacket(entity, packet, progress, point, data, matrices, consumers, overlay, true);
+        }
+    }
+
+    /** Shared normal/mask pass, so outlines use the exact same model, pose and fluid geometry. */
+    public static void renderPacket(BlockEntity entity, ChuteBlockEntity.BeltItem packet, float progress, Vec3 point,
+                                    BeltData data, PoseStack matrices, MultiBufferSource consumers, int overlay, boolean tray) {
+        var client = Minecraft.getInstance();
+        var renderer = client.getItemRenderer();
         var world = entity.getLevel();
-        var entityCenter = entity.getBlockPos().getCenter();
-
-        for (var itemData : renderedItems) {
-            if (!itemData.visible(presentationTick)) continue;
-            var renderedStack = itemData.stack;
-            var renderedProgress = itemData.renderedProgress(presentationTick);
-
-            var worldPoint = SplineUtil.getPositionOnSpline(beltData, renderedProgress);
-
-            // abort early is camera is too far away
-            var camDist = camPos.distanceToSqr(worldPoint);
-            if (camDist > itemRenderDistSq) continue;
-
-            // abort if item is behind player (very basic frustum culling)
-            var itemOffset = worldPoint.subtract(camPos);
-            // negative dot product means the item is behind
-            if (camDist > 1f && camLookDir.dot(itemOffset) < 0)
-                continue;
-
-            BeltPickupTarget.consider(entity, output, itemData, renderedProgress, worldPoint);
-
-            // One lookup resolves both tangent samples; the item position is already known.
-            var tangent = SplineUtil.getWindowOnSpline(beltData, renderedProgress - 0.001f, renderedProgress + 0.001f);
-            var forward = tangent[1].subtract(tangent[0]);
-            var renderPosition = worldPoint.subtract(entityCenter);
-            var flatForward = new Vec3(forward.x, 0, forward.z).normalize();
-            var dot = UNIT_X.dot(flatForward);
-            var angleRad = Math.acos(net.minecraft.util.Mth.clamp(dot, -1, 1));
-            var angleUp = Math.acos(net.minecraft.util.Mth.clamp(forward.normalize().dot(flatForward), -1, 1));
-
-            if (forward.y < 0)
-                angleUp = -angleUp;
-
-            if (flatForward.z > 0) {
-                angleRad = -angleRad;
-            }
-
+        if (world == null) return;
+        boolean vertical = data.isVertical();
+        double yaw = 0, slope = 0;
+        if (!vertical) {
+            var window = SplineUtil.getWindowOnSpline(data, progress - .001, progress + .001);
+            var forward = window[1].subtract(window[0]);
+            yaw = -Math.atan2(forward.z, forward.x);
+            slope = Math.atan2(forward.y, Math.sqrt(forward.x * forward.x + forward.z * forward.z));
+        }
+        var position = point.subtract(Vec3.atLowerCornerOf(entity.getBlockPos()));
+        int light = lightAt(world, BlockPos.containing(point));
+        if (vertical && tray) {
             matrices.pushPose();
-            matrices.translate(renderPosition.x, renderPosition.y, renderPosition.z);
-            matrices.translate(0.5f, 0.8f - 3 / 16f, 0.5f);
-
-            if (pureneko.conveyor_belt_plus.util.FluidPackets.isPacket(renderedStack)) {
-                matrices.mulPose(Axis.YP.rotationDegrees((float) Math.toDegrees(angleRad)));
-                FluidPacketRenderer.render(pureneko.conveyor_belt_plus.util.FluidPackets.get(renderedStack), entity.getLevel(),
-                        matrices, vertexConsumers, lightAt(entity.getLevel(), BlockPos.containing(worldPoint)), overlay);
-                matrices.popPose();
-                continue;
-            }
-            var bakedmodel = Minecraft.getInstance().getItemRenderer().getModel(renderedStack, entity.getLevel(), null, 0);
-            var useItemTransform = !bakedmodel.getQuads(null, null, net.minecraft.util.RandomSource.create(itemData.id)).isEmpty();
-
-            if (useItemTransform) {
-                matrices.translate(0, -2 / 16f, 0);
-                matrices.scale(0.8f, 0.8f, 0.8f);
-            }
-
-            matrices.mulPose(Axis.YP.rotationDegrees((float) Math.toDegrees(angleRad)));
-            if (Math.abs(angleUp) > 0.01f)
-                matrices.mulPose(Axis.ZP.rotationDegrees((float) Math.toDegrees(angleUp)));
-            matrices.mulPose(Axis.XP.rotationDegrees(90));
-
-            matrices.scale(0.6f, 0.6f, 0.6f);
-
-            var worldPos = BlockPos.containing(worldPoint);
-
-            var worldLight = lightAt(world, worldPos);
-
-            itemRenderer.renderStatic(
-              renderedStack,
-              ItemDisplayContext.FIXED,
-              worldLight,
-              overlay,
-              matrices,
-              vertexConsumers,
-              world,
-              0
-            );
-
+            matrices.translate(position.x - .30, position.y - .12, position.z - .30);
+            matrices.scale(.60f, .24f, .60f);
+            client.getBlockRenderer().renderSingleBlock(TRAY, matrices, consumers, light, overlay);
             matrices.popPose();
         }
-
+        matrices.pushPose();
+        matrices.translate(position.x, position.y + (vertical ? .18 : .1125), position.z);
+        matrices.mulPose(Axis.YP.rotation((float) yaw));
+        if (pureneko.conveyor_belt_plus.util.FluidPackets.isPacket(packet.stack)) {
+            FluidPacketRenderer.render(pureneko.conveyor_belt_plus.util.FluidPackets.get(packet.stack), world,
+                    matrices, consumers, light, overlay);
+        } else {
+            var model = renderer.getModel(packet.stack, world, null, 0);
+            if (FLAT_MODELS.size() > 512) FLAT_MODELS.clear();
+            boolean flat = FLAT_MODELS.computeIfAbsent(model,
+                    candidate -> !candidate.getQuads(null, null, net.minecraft.util.RandomSource.create(0)).isEmpty());
+            if (flat) {
+                matrices.translate(0, -.125, 0);
+                matrices.scale(.8f, .8f, .8f);
+            }
+            // No pitch on a lift: the item stays flat on its carrier in either travel direction.
+            if (!vertical && Math.abs(slope) > .0001) matrices.mulPose(Axis.ZP.rotation((float) slope));
+            matrices.mulPose(Axis.XP.rotationDegrees(90));
+            matrices.scale(.6f, .6f, .6f);
+            renderer.render(packet.stack, ItemDisplayContext.FIXED, false, matrices, consumers, light, overlay, model);
+        }
+        matrices.popPose();
     }
 
     private void renderBeltFilter(ChuteBlockEntity entity, PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay, int itemRenderDistSq) {

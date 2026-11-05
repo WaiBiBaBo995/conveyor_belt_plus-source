@@ -77,8 +77,8 @@ public final class ClientSmokeTests {
                         };
                         world.setBlockAndUpdate(source.west(), Blocks.CHEST.defaultBlockState());
                         world.setBlockAndUpdate(target.east(), Blocks.CHEST.defaultBlockState());
-                        world.setBlockAndUpdate(source, block.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-                        world.setBlockAndUpdate(target, block.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+                        world.setBlockAndUpdate(source, block.defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+                        world.setBlockAndUpdate(target, block.defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
                         ((ChestBlockEntity) world.getBlockEntity(source.west())).setItem(0, new ItemStack(Items.DIAMOND, 64));
                         if (!((ChuteBlockEntity) world.getBlockEntity(source)).connectOutgoing(Direction.EAST, target,
                                 Direction.WEST, java.util.List.of(), tier + 1)) throw new AssertionError("Smoke route failed");
@@ -139,8 +139,8 @@ public final class ClientSmokeTests {
                     for (int i = 1; i <= 2; i++) {
                         var pos = SOURCE.south(i * 3);
                         var block = i == 1 ? BlockContent.FLUID_CHUTE.get() : BlockContent.UNIVERSAL_CHUTE.get();
-                        world.setBlockAndUpdate(pos, block.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-                        world.setBlockAndUpdate(pos.east(10), block.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+                        world.setBlockAndUpdate(pos, block.defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+                        world.setBlockAndUpdate(pos.east(10), block.defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
                         var chute = (ChuteBlockEntity) world.getBlockEntity(pos);
                         chute.connectOutgoing(Direction.EAST, pos.east(10), Direction.WEST, java.util.List.of(), i);
                         chute.pickupAccess(Direction.EAST).items().add(new ChuteBlockEntity.BeltItem(.4f, 8765 + i,

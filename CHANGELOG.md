@@ -1,3 +1,20 @@
+## 3.8.0
+
+- After selecting the first endpoint in RTS, defer only the second-endpoint placement until native right-button release: dragging rotates/pans the camera and preserves the draft, while a stationary press connects on release. First-endpoint, support, upgrade and reset actions retain their existing behavior.
+- Correct vertical belt contact using the horizontal interface's rotated connection frame, remove the horizontal-only Y shift from lifts, and align carriers, cargo, pickup hit paths and projections with the corrected surface. Existing cargo progress remains saved.
+
+- Mirror upper/lower interface models and align lift endpoints with the interface lips, including existing routes.
+- Top/bottom clicks default to horizontal placement; sneak places vertical interfaces, both directly and while connecting belts.
+- Restore continuous construction previews toward blocks and empty air, with red invalid-route feedback.
+- Extend RTS Building interactions to vertical placement, body upgrades, interface replacement and selected-cargo outlines. Use selected server inventory materials and refund linked storage first, then player inventory, then drop overflow. Preserve the builder draft.
+
+- Interfaces support all six faces. Straight vertical item/fluid lifts use moving smooth-stone slab carriers; join horizontal and vertical routes through separate interfaces on a shared container.
+- Sneak-use a universal interface to replace an item/fluid interface of the same or a lower tier, preserving routes, contents and existing settings. The new domain starts with normal defaults.
+- Sneak-use a higher-tier belt on the belt body or source endpoint to upgrade the whole route; a flashing projection shows the replacement. Drafts persist, including on the refunded old belt when the last new belt is consumed.
+- Pickable cargo receives a white alpha silhouette outline with scene-depth occlusion. Local checks include item inventory space and fluid-container compatibility; the server still validates interactions.
+- Cache construction/upgrade preview meshes and model queries. Phase ordinary interface movement snapshots to 10 Hz while sending starts, stops and content changes immediately. Splitter update frequency is unchanged.
+- Unloaded destination/support chunks pause ordinary interface routes without forcing chunks or dropping queued cargo.
+
 # Changelog （English）
 
 ## 3.7.1 — Support-aware belt validation and performance improvements (2026-10-02)
@@ -32,6 +49,19 @@
 - Expand GameTests for fluid capabilities, persistence, conservation, immutable components, tab security and optional RTS/Jade integration.
 
 # 更新日志 (中文)
+
+## 3.8.0 — 垂直升降、通用接口替换和货物描边（2026-11-05）
+
+- 修正上下接口镜像与升降带端点位置，已有线路加载后采用新的显示位置，保留货物与进度。
+- 直接放置接口及手持带自动安装接口统一：顶底面默认水平放置，潜行时才垂直放置。
+- 恢复随鼠标持续显示的施工投影，支持空中落点及红色无效线路提示。
+- RTS Building 同步支持垂直放置、带体升级、接口替换、升级投影与货物描边；使用服务端实际材料，旧材料优先返还关联仓储，再到背包，余量掉落，保留建造草稿。
+
+- 接口可在容器六面放置；同 X/Z 的上下接口可建立直线升降带，每份物品／流体由平滑石台阶托板承载，不消耗额外材料。水平与垂直线路通过同一容器上的独立接口衔接。
+- 潜行右键可用同级或更高级通用接口替换物品／流体接口，保留线路、在途货物及原有配置，新增领域使用默认设置。
+- 手持高级带潜行右键带体或起点接口可升级整条线路，显示闪烁的新等级投影；生存模式消耗与返还各一条，保留未完成的连接草稿。
+- 可拿取货物显示贴合外形的白色发光描边，兼容流体容器判断与场景深度遮挡。
+- 缓存放置／升级投影网格与模型查询，普通接口连续运动同步降至 10 Hz；装卸、启停立即同步，分流器频率不变。目标或支架区块卸载时暂停线路并保留货物。
 
 ## 3.7.1 — 支架感知的传送带校验与性能优化（2026-10-02）
 

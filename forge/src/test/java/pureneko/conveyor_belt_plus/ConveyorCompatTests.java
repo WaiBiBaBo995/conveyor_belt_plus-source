@@ -35,8 +35,8 @@ public final class ConveyorCompatTests {
         var player = ctx.makeMockSurvivalPlayer();
         var start = ctx.absolutePos(new BlockPos(2, 2, 5));
         var end = ctx.absolutePos(new BlockPos(12, 2, 5));
-        world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-        world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+        world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
         var first = new ItemStack(ItemContent.ADVANCED_BELT.get());
         player.setItemInHand(InteractionHand.MAIN_HAND, first);
         var begin = new UseOnContext(player, InteractionHand.MAIN_HAND, new BlockHitResult(start.getCenter(), Direction.EAST, start, false));

@@ -37,6 +37,10 @@ public final class BeltPickupTarget {
     private static net.minecraft.world.item.ItemStack heldForInsertion = net.minecraft.world.item.ItemStack.EMPTY;
     private static net.minecraft.world.item.ItemStack shownStack = net.minecraft.world.item.ItemStack.EMPTY;
     private static int shownTier;
+    public record Visual(BlockEntity entity, ChuteBlockEntity.BeltItem packet, float progress,
+                         Vec3 point, ChuteBlockEntity.BeltData data) {}
+    private static Visual visual;
+    public static Visual selectedVisual() { return current() == null ? null : visual; }
     public record Target(BlockPos owner, Direction port, long id, float progress, Vec3 hit,
                          net.minecraft.world.item.ItemStack stack, int tier) {}
 
@@ -48,6 +52,7 @@ public final class BeltPickupTarget {
     public static void clear() {
         frameWorld = null;
         owner = null;
+        visual = null;
         insertionOwner = null;
         shownStack = net.minecraft.world.item.ItemStack.EMPTY;
         eye = end = hit = null;
@@ -60,6 +65,7 @@ public final class BeltPickupTarget {
         if (frameWorld != client.level) lastRequest = Integer.MIN_VALUE;
         frameWorld = client.level;
         owner = null;
+        visual = null;
         insertionOwner = null;
         eye = null;
         remote = false;
@@ -100,7 +106,7 @@ public final class BeltPickupTarget {
     }
 
     public static void consider(BlockEntity entity, Direction output, ChuteBlockEntity.BeltItem packet,
-                                float shown, Vec3 point) {
+                                float shown, Vec3 point, ChuteBlockEntity.BeltData data) {
         if (eye == null || entity.getLevel() != frameWorld || point.distanceToSqr(eye) > centerLimit) return;
         var intersection = BeltPickup.rayHit(BeltPickup.bounds(point), eye, end);
         if (intersection == null) return;
@@ -114,6 +120,7 @@ public final class BeltPickupTarget {
         progress = shown;
         hit = intersection;
         shownStack = packet.stack;
+        visual = new Visual(entity, packet, shown, point, data);
         shownTier = entity instanceof pureneko.conveyor_belt_plus.blocks.ConveyorNode node ? node.outgoingBeltTier(output) : 1;
     }
 
@@ -133,6 +140,17 @@ public final class BeltPickupTarget {
         if (!event.isUseItem() || client.level != frameWorld || client.player == null || remote
                 || client.screen != null || client.player.isSpectator()
                 || System.nanoTime() - frameTime > 250_000_000L) return;
+        // Sneak-upgrade wins over inserting a held belt item, even when it contains a connection draft.
+        if (insertionOwner != null && client.player.isShiftKeyDown()
+                && client.player.getMainHandItem().getItem() instanceof pureneko.conveyor_belt_plus.items.BeltItem) {
+            event.setCanceled(true);
+            event.setSwingHand(event.getHand() == InteractionHand.MAIN_HAND);
+            if (event.getHand() != InteractionHand.MAIN_HAND || lastRequest == client.player.tickCount) return;
+            lastRequest = client.player.tickCount;
+            if (currentUpgrade() != null) NetworkChannel.sendToServer(new pureneko.conveyor_belt_plus.network.BeltUpgradeNetworking.Request(insertionOwner, insertionPort));
+            else client.player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.conveyor_belt_plus.upgrade_requires_higher"), true);
+            return;
+        }
         boolean taking = owner != null && canTake(shownStack, client.player.getMainHandItem());
         if (!taking && (insertionOwner == null || !pureneko.conveyor_belt_plus.blocks.BeltInsertion.validStack(client.player.getMainHandItem()))) return;
         if (!BeltPickup.unobstructed(client.player, eye, taking ? hit : insertionHit)) return;
@@ -142,6 +160,20 @@ public final class BeltPickupTarget {
         lastRequest = client.player.tickCount;
         if (taking) NetworkChannel.sendToServer(new PickupNetworking.Request(owner, port, itemId, progress));
         else NetworkChannel.sendToServer(new pureneko.conveyor_belt_plus.network.InsertionNetworking.Put(insertionOwner, insertionPort));
+    }
+
+    public record UpgradeTarget(BlockPos owner, Direction port, ChuteBlockEntity.BeltData data, int previous, int tier) {}
+
+    public static UpgradeTarget currentUpgrade() {
+        var client = Minecraft.getInstance();
+        if (eye == null || insertionOwner == null || client.level != frameWorld || client.player == null
+                || !(remote ? net.minecraft.client.gui.screens.Screen.hasShiftDown() : client.player.isShiftKeyDown()) || !client.player.getAbilities().mayBuild || client.player.isSpectator()
+                || !remote && client.screen != null || System.nanoTime() - frameTime > 250_000_000L
+                || !(heldForInsertion.getItem() instanceof pureneko.conveyor_belt_plus.items.BeltItem belt)) return null;
+        var node = pureneko.conveyor_belt_plus.blocks.ConveyorNodeUtil.get(frameWorld, insertionOwner);
+        var access = node == null ? null : node.pickupAccess(insertionPort);
+        return access != null && pureneko.conveyor_belt_plus.util.TierUpgrade.isUpgrade(access.tier(), belt.getBeltTier())
+                ? new UpgradeTarget(insertionOwner, insertionPort, access.data(), access.tier(), belt.getBeltTier()) : null;
     }
 
     public static boolean putRemote(Vec3 origin, Vec3 direction, net.minecraft.world.item.ItemStack selected) {
@@ -155,6 +187,29 @@ public final class BeltPickupTarget {
         NetworkChannel.sendToServer(new pureneko.conveyor_belt_plus.network.InsertionNetworking.RemotePut(
                 insertionOwner, insertionPort, origin, direction, selected.copyWithCount(1)));
         return true;
+    }
+
+    public static boolean canHighlight() {
+        var client = Minecraft.getInstance();
+        var player = client.player;
+        if (current() == null || player == null || player.isSpectator() || !player.getAbilities().mayBuild
+                || !remote && client.screen != null || player.containerMenu != player.inventoryMenu
+                || !canTake(shownStack, remote ? heldForInsertion : player.getMainHandItem())) return false;
+        if (pureneko.conveyor_belt_plus.util.FluidPackets.isPacket(shownStack)) {
+            var copy = shownStack.copy();
+            if (remote) return net.minecraftforge.fluids.FluidUtil.tryFillContainer(heldForInsertion.copy(),
+                    pureneko.conveyor_belt_plus.forge.ConveyorFluidApi.packetHandler(copy),
+                    pureneko.conveyor_belt_plus.util.FluidPackets.amount(copy), null, false).isSuccess();
+            return net.minecraftforge.fluids.FluidUtil.tryFillContainerAndStow(player.getMainHandItem().copy(),
+                    pureneko.conveyor_belt_plus.forge.ConveyorFluidApi.packetHandler(copy),
+                    new net.minecraftforge.items.wrapper.PlayerMainInvWrapper(player.getInventory()),
+                    pureneko.conveyor_belt_plus.util.FluidPackets.amount(copy), null, false).isSuccess();
+        }
+        for (var slot : player.getInventory().items) {
+            if (slot.isEmpty() || net.minecraft.world.item.ItemStack.isSameItemSameTags(slot, shownStack)
+                    && slot.getCount() < Math.min(slot.getMaxStackSize(), player.getInventory().getMaxStackSize())) return true;
+        }
+        return false;
     }
 
     public static boolean canTake(net.minecraft.world.item.ItemStack packet, net.minecraft.world.item.ItemStack held) {

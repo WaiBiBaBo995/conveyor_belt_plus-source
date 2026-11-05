@@ -30,7 +30,7 @@ public final class BeltMeshRenderer {
 
     public static void draw(Level world, BeltQuad[] quads, PoseStack matrices,
                             MultiBufferSource consumers, int tier, int frame, int overlay,
-                            int color, boolean preview) {
+                            int color, boolean preview, boolean vertical) {
         if (quads == null) return;
         var texture = TEXTURES[net.minecraft.util.Mth.clamp(tier, 1, 3) - 1];
         var consumer = consumers.getBuffer(preview ? RenderType.entityTranslucent(texture)
@@ -38,7 +38,7 @@ public final class BeltMeshRenderer {
         var camera = Minecraft.getInstance().getCameraEntity();
         var cameraPos = camera == null ? null : camera.position();
         matrices.pushPose();
-        matrices.translate(0, -2 / 16f + 0.08f, 0);
+        if (!vertical) matrices.translate(0, -2 / 16f + 0.08f, 0);
         var entry = matrices.last();
         for (var quad : quads) {
             if (!preview && cameraPos != null && cameraPos.distanceToSqr(

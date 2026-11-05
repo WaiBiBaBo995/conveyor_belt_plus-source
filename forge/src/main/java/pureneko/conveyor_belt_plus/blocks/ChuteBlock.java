@@ -20,7 +20,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -42,14 +42,26 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-public class ChuteBlock extends HorizontalDirectionalBlock implements EntityBlock {
+public class ChuteBlock extends DirectionalBlock implements EntityBlock {
 
-    private static final DirectionalShapes SHAPES = new DirectionalShapes(ChuteBlock::createShape);
+    private static final java.util.Map<Direction, VoxelShape> SHAPES = new java.util.EnumMap<>(Direction.class);
 
     private static VoxelShape createShape(Direction direction) {
+        if (direction.getAxis().isVertical()) {
+            // Rotate the north-facing attachment about the block centre, matching the blockstate model.
+            VoxelShape north = createShape(Direction.NORTH);
+            VoxelShape result = Shapes.empty();
+            for (var box : north.toAabbs()) {
+                boolean up = direction == Direction.UP;
+                result = Shapes.or(result, Shapes.box(box.minX, up ? 1 - box.maxZ : box.minZ,
+                        box.minY - .125, box.maxX,
+                        up ? 1 - box.minZ : box.maxZ, box.maxY - .125));
+            }
+            return result.optimize();
+        }
         return Shapes.or(
-          MathHelpers.rotateVoxelShape(Shapes.box(2 / 16f, 4 / 16f, 14 / 16f, 14 / 16f, 1f, 1f), direction, AttachFace.FLOOR),
-          MathHelpers.rotateVoxelShape(Shapes.box(3 / 16f, 5 / 16f, 16 / 16f, 13 / 16f, 15 / 16f, 18 / 16f), direction, AttachFace.FLOOR)
+                MathHelpers.rotateVoxelShape(Shapes.box(2 / 16f, 4 / 16f, 14 / 16f, 14 / 16f, 1f, 1f), direction, AttachFace.FLOOR),
+                MathHelpers.rotateVoxelShape(Shapes.box(3 / 16f, 5 / 16f, 1f, 13 / 16f, 15 / 16f, 18 / 16f), direction, AttachFace.FLOOR)
         ).optimize();
     }
 
@@ -67,7 +79,7 @@ public class ChuteBlock extends HorizontalDirectionalBlock implements EntityBloc
         super(settings);
         this.kind = kind;
         this.tier = pureneko.conveyor_belt_plus.util.BeltTiers.normalize(tier);
-        registerDefaultState(defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
+        registerDefaultState(defaultBlockState().setValue(FACING, Direction.NORTH));
     }
 
     @Override
@@ -111,23 +123,20 @@ public class ChuteBlock extends HorizontalDirectionalBlock implements EntityBloc
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
-        return SHAPES.get(state.getValue(BlockStateProperties.HORIZONTAL_FACING));
+        return SHAPES.computeIfAbsent(state.getValue(FACING), ChuteBlock::createShape);
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(BlockStateProperties.HORIZONTAL_FACING);
+        builder.add(FACING);
     }
 
     @Nullable
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
 
-        var targetFacing = ctx.getClickedFace();
-        if (targetFacing.getAxis().isVertical())
-            targetFacing = ctx.getHorizontalDirection().getOpposite();
-
-        return Objects.requireNonNull(super.getStateForPlacement(ctx)).setValue(BlockStateProperties.HORIZONTAL_FACING, targetFacing);
+        return defaultBlockState().setValue(FACING, pureneko.conveyor_belt_plus.util.ChutePlacementPlan.facing(
+                ctx.getClickedFace(), ctx.getHorizontalDirection(), ctx.getPlayer() != null && ctx.getPlayer().isShiftKeyDown(), true));
     }
 
 
@@ -168,6 +177,7 @@ public class ChuteBlock extends HorizontalDirectionalBlock implements EntityBloc
     public void appendHoverText(ItemStack stack, net.minecraft.world.level.BlockGetter context, List<Component> tooltip, TooltipFlag options) {
         String summary = kind == ChuteKind.ITEM ? "chute" : kind == ChuteKind.FLUID ? "fluid_chute" : "universal_chute";
         tooltip.add(Component.translatable("tooltip.conveyor_belt_plus." + summary + ".summary").withStyle(ChatFormatting.GRAY));
+        if (kind == ChuteKind.UNIVERSAL) tooltip.add(Component.translatable("tooltip.conveyor_belt_plus.universal_chute.replace").withStyle(ChatFormatting.YELLOW));
         if (kind.supports(false)) tooltip.add(Component.translatable("block.conveyor_belt_plus.chute.capacity",
                 pureneko.conveyor_belt_plus.config.ConveyorConfig.chuteStacks(tier),
                 pureneko.conveyor_belt_plus.config.ConveyorConfig.chuteFilters(tier)).withStyle(ChatFormatting.AQUA));

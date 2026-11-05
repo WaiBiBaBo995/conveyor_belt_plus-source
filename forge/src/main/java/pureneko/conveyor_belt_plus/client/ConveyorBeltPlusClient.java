@@ -26,13 +26,16 @@ public final class ConveyorBeltPlusClient {
                         new pureneko.conveyor_belt_plus.client.screens.ConveyorConfigScreen(parent)));
         modBus.addListener(ConveyorBeltPlusClient::registerScreens);
         modBus.addListener(ConveyorBeltPlusClient::registerRenderers);
+        modBus.addListener(BeltCargoOutline::shaders);
         MinecraftForge.EVENT_BUS.addListener(ConveyorBeltPlusClient::tick);
-        MinecraftForge.EVENT_BUS.addListener(ConveyorBeltPlusClient::outline);
+
         MinecraftForge.EVENT_BUS.addListener(BeltPickupTarget::beginFrame);
+        MinecraftForge.EVENT_BUS.addListener(BeltCargoOutline::render);
         MinecraftForge.EVENT_BUS.addListener(BeltPickupTarget::interact);
         if (net.minecraftforge.fml.ModList.get().isLoaded("rtsbuilding")) {
-            MinecraftForge.EVENT_BUS.addListener(pureneko.conveyor_belt_plus.compat.rts.RtsClient::render);
+
             MinecraftForge.EVENT_BUS.addListener(pureneko.conveyor_belt_plus.compat.rts.RtsClient::click);
+            MinecraftForge.EVENT_BUS.addListener(pureneko.conveyor_belt_plus.compat.rts.RtsClient::release);
         }
     }
     private static void tick(net.minecraftforge.event.TickEvent.ClientTickEvent event) {
@@ -44,12 +47,9 @@ public final class ConveyorBeltPlusClient {
         if (client.level == null) {
             BeltPickupTarget.clear();
             ChuteBeltRenderer.clearLightingCache();
+            BeltCargoOutline.release();
+            BeltOutlineRenderer.clear();
         }
-    }
-    private static void outline(RenderHighlightEvent.Block event) {
-        if (Minecraft.getInstance().screen != null) return;
-        BeltOutlineRenderer.renderPlannedBelt(Minecraft.getInstance().level, event.getCamera(),
-                event.getPoseStack(), event.getMultiBufferSource());
     }
     private static void registerScreens(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) {
         event.enqueueWork(() -> net.minecraft.client.gui.screens.MenuScreens.register(ScreenContent.CHUTE.get(), ChuteScreen::new));
