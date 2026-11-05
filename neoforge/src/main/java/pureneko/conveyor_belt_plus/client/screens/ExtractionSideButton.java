@@ -26,10 +26,14 @@ final class ExtractionSideButton extends Button {
         return Component.translatable("screen.conveyor_belt_plus.extraction." + (checked() ? "on" : "off"));
     }
     private net.minecraft.network.chat.MutableComponent faceText() {
-        return Component.translatable("screen.conveyor_belt_plus.extraction.face", Component.translatable(side.translationKey()),
+        return Component.translatable("screen.conveyor_belt_plus.extraction.face", Component.translatable(handler.getFacing().getAxis().isVertical()
+                        ? "screen.conveyor_belt_plus.extraction.world." + side.direction(handler.getFacing()).getName() : side.translationKey()),
                 Component.translatable("screen.conveyor_belt_plus.extraction.world." + side.direction(handler.getFacing()).getName()));
     }
     @Override protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+        if (handler.getFacing().getAxis().isVertical())
+            setMessage(Component.translatable("screen.conveyor_belt_plus.extraction.world_short." + side.direction(handler.getFacing()).getName()));
+        else setMessage(Component.translatable(side.translationKey() + ".short"));
         int state = handler.getFacing().get3DDataValue() * 2 + (checked() ? 1 : 0);
         if (tooltipState != state) {
             tooltipState = state;

@@ -48,8 +48,8 @@ public final class ConveyorGameTests {
         var world = context.getLevel();
         var source = context.absolutePos(new BlockPos(2, 2, 2));
         var target = context.absolutePos(new BlockPos(12, 2, 2));
-        world.setBlockAndUpdate(source, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(source, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+        world.setBlockAndUpdate(target, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
         var chute = (ChuteBlockEntity) world.getBlockEntity(source);
         chute.setRule(0, FilterRule.tag("minecraft:logs"));
         chute.setRule(1, FilterRule.item(new ItemStack(Items.DIAMOND_SWORD), true));
@@ -94,8 +94,8 @@ public final class ConveyorGameTests {
         var east = context.absolutePos(new BlockPos(14, 2, 7));
         var north = context.absolutePos(new BlockPos(7, 2, 1));
         world.setBlockAndUpdate(source, BlockContent.SPLITTER.get().defaultBlockState());
-        world.setBlockAndUpdate(east, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
-        world.setBlockAndUpdate(north, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        world.setBlockAndUpdate(east, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(north, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.SOUTH));
         var splitter = (ConveyorSplitterBlockEntity) world.getBlockEntity(source);
         splitter.connectIncoming(Direction.WEST, source.west(5));
         context.assertTrue(splitter.connectOutgoing(Direction.EAST, east, Direction.WEST, java.util.List.of(), 1), "east route");

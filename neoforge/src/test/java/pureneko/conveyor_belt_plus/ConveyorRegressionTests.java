@@ -60,8 +60,7 @@ public final class ConveyorRegressionTests {
 
     private static void extractionSides() {
         var faces = pureneko.conveyor_belt_plus.util.ExtractionSide.values();
-        for (var front : new net.minecraft.core.Direction[]{net.minecraft.core.Direction.NORTH,
-                net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.WEST}) {
+        for (var front : net.minecraft.core.Direction.values()) {
             var directions = java.util.EnumSet.noneOf(net.minecraft.core.Direction.class);
             var cells = new java.util.HashSet<String>();
             for (var face : faces) {

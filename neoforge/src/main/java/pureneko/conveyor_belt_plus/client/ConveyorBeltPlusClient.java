@@ -23,16 +23,19 @@ public final class ConveyorBeltPlusClient {
                 net.neoforged.neoforge.client.gui.ConfigurationScreen::new);
         modBus.addListener(ConveyorBeltPlusClient::registerScreens);
         modBus.addListener(ConveyorBeltPlusClient::registerRenderers);
+        modBus.addListener(BeltCargoOutline::shaders);
         modBus.addListener((net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent event) ->
                 event.registerItem(FluidPacketItemRenderer.EXTENSIONS,
                         pureneko.conveyor_belt_plus.registry.ItemContent.FLUID_PACKET.get()));
         NeoForge.EVENT_BUS.addListener(ConveyorBeltPlusClient::tick);
-        NeoForge.EVENT_BUS.addListener(ConveyorBeltPlusClient::outline);
+
         NeoForge.EVENT_BUS.addListener(BeltPickupTarget::beginFrame);
+        NeoForge.EVENT_BUS.addListener(BeltCargoOutline::render);
         NeoForge.EVENT_BUS.addListener(BeltPickupTarget::interact);
         if (net.neoforged.fml.ModList.get().isLoaded("rtsbuilding")) {
-            NeoForge.EVENT_BUS.addListener(pureneko.conveyor_belt_plus.compat.rts.RtsClient::render);
+
             NeoForge.EVENT_BUS.addListener(pureneko.conveyor_belt_plus.compat.rts.RtsClient::click);
+            NeoForge.EVENT_BUS.addListener(pureneko.conveyor_belt_plus.compat.rts.RtsClient::release);
         }
     }
     private static void tick(ClientTickEvent.Pre event) {
@@ -43,12 +46,9 @@ public final class ConveyorBeltPlusClient {
         if (client.level == null) {
             BeltPickupTarget.clear();
             ChuteBeltRenderer.clearLightingCache();
+            BeltCargoOutline.release();
+            BeltOutlineRenderer.clear();
         }
-    }
-    private static void outline(RenderHighlightEvent.Block event) {
-        if (Minecraft.getInstance().screen != null) return;
-        BeltOutlineRenderer.renderPlannedBelt(Minecraft.getInstance().level, event.getCamera(),
-                event.getPoseStack(), event.getMultiBufferSource());
     }
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ScreenContent.CHUTE.get(), ChuteScreen::new);

@@ -68,8 +68,13 @@ public class BeltItem extends Item {
         if (player == null || !player.getAbilities().mayBuild) return InteractionResult.PASS;
         if (world.isClientSide) return InteractionResult.SUCCESS;
 
-        if (pureneko.conveyor_belt_plus.compat.rts.RtsCompat.active(player))
+        if (pureneko.conveyor_belt_plus.compat.rts.RtsCompat.active(player)) {
+            var node = ConveyorNodeUtil.get(world, context.getClickedPos());
+            var port = node instanceof ChuteBlockEntity chute ? chute.getOwnFacing() : interactionPort(context);
+            if (player.isShiftKeyDown() && node != null && node.outgoingBeltTier(port) > 0)
+                return useEndpoint(context); // An upgrade must not consume/reset the independent RTS construction draft.
             return pureneko.conveyor_belt_plus.compat.rts.RtsBeltDrafts.use(player, stack, () -> useEndpoint(context));
+        }
         return useEndpoint(context);
     }
 
@@ -86,7 +91,7 @@ public class BeltItem extends Item {
         if (clickedNode != null) {
             var port = interactionPort(context);
             var upgradePort = clickedNode instanceof ChuteBlockEntity chute ? chute.getOwnFacing() : port;
-            if (player.isShiftKeyDown() && !hasStart && clickedNode.outgoingBeltTier(upgradePort) > 0) {
+            if (player.isShiftKeyDown() && clickedNode.outgoingBeltTier(upgradePort) > 0) {
                 if (pureneko.conveyor_belt_plus.blocks.UpgradeInteractions.belt(world, clickedPos, upgradePort, player, stack, beltTier))
                     return InteractionResult.SUCCESS;
                 player.displayClientMessage(Component.translatable("message.conveyor_belt_plus.upgrade_requires_higher"), true);
@@ -146,9 +151,7 @@ public class BeltItem extends Item {
         }
 
         var endPos = clickedPos.offset(context.getClickedFace().getNormal());
-        var endDir = context.getClickedFace();
-        if (endDir.getAxis() == Direction.Axis.Y)
-            endDir = context.getHorizontalDirection();
+        var endDir = ChutePlacementPlan.facing(context.getClickedFace(), context.getHorizontalDirection(), player.isShiftKeyDown(), !hasStart);
 
         var candidateState = world.getBlockState(endPos);
         if (candidateState.canBeReplaced() || candidateState.isAir()) {
@@ -159,8 +162,7 @@ public class BeltItem extends Item {
                         ? InteractionResult.SUCCESS : InteractionResult.FAIL;
             }
 
-            if (context.getClickedFace().getAxis() != Direction.Axis.Y)
-                endDir = endDir.getOpposite();
+            endDir = endDir.getOpposite();
             stack.set(ComponentContent.BELT_START.get(), endPos);
             stack.set(ComponentContent.BELT_DIR.get(), endDir.getOpposite());
             player.displayClientMessage(Component.translatable("message.conveyor_belt_plus.started"), true);

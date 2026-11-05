@@ -9,7 +9,10 @@ repositories {
 dependencies {
     minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
     mappings loom.officialMojangMappings()
-    neoForge "net.neoforged:neoforge:$rootProject.neoforge_version"
+    // RTS 1.1.7 requires NeoForge >=21.1.221. Keep the baseline build while testing its integration on a supported loader.
+    def neoVersion = providers.gradleProperty('withRts').getOrElse('false').toBoolean()
+            ? rootProject.rts_test_neoforge_version : rootProject.neoforge_version
+    neoForge "net.neoforged:neoforge:$neoVersion"
     modCompileOnly "mezz.jei:jei-$rootProject.minecraft_version-common-api:$rootProject.jei_version"
     modCompileOnly "maven.modrinth:jade:$rootProject.jade_version"
     modCompileOnly "maven.modrinth:rts-building-build-from-above:$rootProject.rts_version"
@@ -144,3 +147,82 @@ tasks.register('resourceIntegrityTest') {
     }
 }
 tasks.named('check') { dependsOn 'resourceIntegrityTest' }
+
+// Opt-in isolated renderer/interaction fixture for the vertical conveyor features.
+if (providers.gradleProperty('verticalClientSmoke').getOrElse('false').toBoolean()) {
+    sourceSets.test.java.srcDir 'src/verticalClientTest/java'
+    loom.runs.client {
+        source sourceSets.test
+        runDir 'run-vertical-smoke'
+        mods { conveyor_belt_plus { sourceSet sourceSets.main; sourceSet sourceSets.test } }
+    }
+    tasks.named('runClient') {
+        dependsOn testClasses
+        doFirst {
+            def source = file('build/run-gametest-conveyor-belt-plus/world')
+            if (!new File(source, 'level.dat').isFile()) throw new GradleException('Run GameTest before verticalClientSmoke.')
+            project.sync {
+                from source
+                into file('run-vertical-smoke/saves/VerticalSmoke')
+                exclude 'session.lock', 'playerdata/**'
+            }
+            file('run-vertical-smoke/vertical-smoke-success.txt').with { if (exists()) text = '' }
+        }
+        doLast {
+            def result = file('run-vertical-smoke/vertical-smoke-success.txt')
+            if (!result.isFile() || !result.text.contains('passed')) throw new GradleException('Vertical client smoke did not finish.')
+        }
+    }
+}
+
+// Additional opt-in checks in RTS's actual BuilderScreen, using the vertical fixture world.
+if (providers.gradleProperty('rtsClientSmoke').getOrElse('false').toBoolean()) {
+    sourceSets.test.java.srcDir 'src/rtsClientTest/java'
+    loom.runs.client { property 'conveyor.rtsClientSmoke', 'true' }
+    tasks.named('runClient') {
+        doFirst { file('run-vertical-smoke/rts-smoke-success.txt').with { if(exists()) text='' } }
+        doLast {
+            def result=file('run-vertical-smoke/rts-smoke-success.txt')
+            if(!result.isFile() || !result.text.contains('passed')) throw new GradleException('RTS client smoke did not finish.')
+        }
+    }
+}
+
+// A loader dependency failure can exit with code zero before running a single test.
+tasks.named('runGameTest') {
+    doFirst {
+        def log=file('build/run-gametest-conveyor-belt-plus/logs/latest.log')
+        log.parentFile.mkdirs()
+        if(log.exists())log.text=''
+    }
+    doLast {
+        def log=file('build/run-gametest-conveyor-belt-plus/logs/latest.log')
+        if(!log.isFile() || !(log.getText('UTF-8') =~ /All \d+ required tests passed/))
+            throw new GradleException('NeoForge GameTest did not complete successfully; inspect the test server log.')
+    }
+}
+
+// Focused reproduction for RTS endpoint dragging and vertical connection geometry; no full regression run.
+if (providers.gradleProperty('joinClientSmoke').getOrElse('false').toBoolean()) {
+    sourceSets.test.java.srcDir 'src/joinClientTest/java'
+    loom.runs.client {
+        source sourceSets.test
+        runDir 'run-join-smoke'
+        mods { conveyor_belt_plus { sourceSet sourceSets.main; sourceSet sourceSets.test } }
+    }
+    tasks.named('runClient') {
+        dependsOn testClasses
+        doFirst {
+            project.sync {
+                from file('build/run-gametest-conveyor-belt-plus/world')
+                into file('run-join-smoke/saves/JoinSmoke')
+                exclude 'session.lock', 'playerdata/**'
+            }
+            file('run-join-smoke/join-smoke-success.txt').with { if(exists()) text='' }
+        }
+        doLast {
+            def result=file('run-join-smoke/join-smoke-success.txt')
+            if(!result.isFile() || !result.text.contains('passed')) throw new GradleException('Focused endpoint/geometry smoke did not finish.')
+        }
+    }
+}

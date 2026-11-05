@@ -53,9 +53,9 @@ public final class TransportNbtTests {
     }
 
     private static void chutePlacement() {
-        // Vanilla registries are frozen in this headless loader. Use three registered horizontal block
+        // Vanilla registries are frozen in this headless loader. Use three registered six-direction block
         // items to exercise the shared variant-preserving reservation, placement-state and refund code.
-        var variants = new net.minecraft.world.item.Item[]{Items.FURNACE, Items.SMOKER, Items.BLAST_FURNACE};
+        var variants = new net.minecraft.world.item.Item[]{Items.DISPENSER, Items.DROPPER, Items.OBSERVER};
         java.util.function.Predicate<ItemStack> eligible = stack ->
                 java.util.Arrays.stream(variants).anyMatch(stack::is);
         var main = net.minecraft.core.NonNullList.withSize(36, ItemStack.EMPTY);
@@ -68,7 +68,7 @@ public final class TransportNbtTests {
             check(plan.state(0, net.minecraft.core.Direction.EAST).getBlock()
                     == ((net.minecraft.world.item.BlockItem) variants[tier]).getBlock(), "placed endpoint keeps selected block");
             check(plan.state(1, net.minecraft.core.Direction.WEST)
-                    .getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING) == net.minecraft.core.Direction.WEST,
+                    .getValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING) == net.minecraft.core.Direction.WEST,
                     "selected endpoint keeps requested facing");
             check(plan.consume(inventory) && main.get(18).isEmpty(), "consume exact reserved main-inventory stack");
             check(!plan.consume(inventory), "plan cannot consume twice");

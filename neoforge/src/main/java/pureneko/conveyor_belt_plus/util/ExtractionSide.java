@@ -18,6 +18,14 @@ public enum ExtractionSide {
     public boolean selected(int mask) { return (mask & bit()) != 0; }
     public String translationKey() { return "screen.conveyor_belt_plus.extraction." + name().toLowerCase(java.util.Locale.ROOT); }
     public Direction direction(Direction front) {
+        if (front.getAxis().isVertical()) return switch (this) {
+            case FRONT -> front;
+            case BACK -> front.getOpposite();
+            case LEFT -> Direction.WEST;
+            case RIGHT -> Direction.EAST;
+            case TOP -> Direction.NORTH;
+            case BOTTOM -> Direction.SOUTH;
+        };
         return switch (this) {
             case FRONT -> front;
             case BACK -> front.getOpposite();

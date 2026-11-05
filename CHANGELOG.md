@@ -1,5 +1,14 @@
 # Changelog （English）
 
+## 3.8.0 - Vertical lifting, universal interface replacement, and cargo silhouette outlines（2026-11-05）
+
+- Interfaces support all six faces. Straight vertical item/fluid lifts use moving smooth-stone slab carriers.
+- Top/bottom clicks default to horizontal placement; sneak places vertical interfaces, both directly and while connecting belts.
+- Sneak-use a universal interface to replace an item/fluid interface of the same or a lower tier.
+- Sneak-use a higher-tier belt on the belt body or source endpoint to upgrade the whole route; a flashing projection shows the replacement.
+- Pickable cargo receives a white alpha silhouette outline with scene-depth occlusion. Local checks include item inventory space and fluid-container compatibility.
+- Extend RTS Building interactions to vertical placement, body upgrades, interface replacement and selected-cargo outlines. Use selected server inventory materials and refund linked storage first, then player inventory, then drop overflow. Preserve the builder draft.
+
 ## 3.7.1 — Support-aware belt validation and performance improvements (2026-10-02)
 
 - Reset `belt.minimum_angle` and `belt.minimum_turn_radius` at each explicitly selected conveyor support, so every endpoint-to-support section is validated independently instead of combining both sides of a support.
@@ -32,6 +41,15 @@
 - Expand GameTests for fluid capabilities, persistence, conservation, immutable components, tab security and optional RTS/Jade integration.
 
 # 更新日志 (中文)
+
+## 3.8.0 — 垂直升降、通用接口替换和货物描边（2026-11-05）
+
+- 接口可在容器六面放置；同 X/Z 的上下接口可建立直线升降带，每份物品／流体由平滑石台阶托板承载。
+- 直接放置接口及手持带自动安装接口统一：顶底面默认水平放置，潜行时才垂直放置。
+- 潜行右键可用同级或更高级通用接口替换物品／流体接口。
+- 手持高级带潜行右键带体或起点接口可升级整条线路，显示闪烁的新等级投影。
+- 可拿取货物显示贴合外形的白色发光描边，兼容流体容器判断与场景深度遮挡。
+- RTS Building 同步支持垂直放置、带体升级、接口替换、升级投影与货物描边；使用服务端实际材料，旧材料优先返还关联仓储，再到背包，余量掉落，保留建造草稿。
 
 ## 3.7.1 — 支架感知的传送带校验与性能优化（2026-10-02）
 

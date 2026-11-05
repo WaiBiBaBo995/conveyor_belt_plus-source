@@ -27,7 +27,7 @@ public class SplitterBeltRenderer implements BlockEntityRenderer<ConveyorSplitte
             if (route.renderedModel == null)
                 route.renderedModel = ChuteBeltRenderer.createSplineModel(data, entity.getBlockPos());
             BeltMeshRenderer.draw(entity.getLevel(), route.renderedModel, matrices, consumers,
-                    route.getBeltTier(), frame, overlay, CommonColors.WHITE, false);
+                    route.getBeltTier(), frame, overlay, CommonColors.WHITE, false, data.isVertical());
             ChuteBeltRenderer.renderItems(entity, route.getPort(), route.getMovingItems(), matrices, consumers, overlay,
                     data, 64 * 64, presentation);
         }

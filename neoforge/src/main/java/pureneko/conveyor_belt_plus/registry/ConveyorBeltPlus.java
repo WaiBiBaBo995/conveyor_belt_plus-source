@@ -30,6 +30,8 @@ public final class ConveyorBeltPlus {
                         (stack, context) -> pureneko.conveyor_belt_plus.neoforge.ConveyorFluidApi.packetHandler(stack), ItemContent.FLUID_PACKET.get()));
         modBus.addListener(pureneko.conveyor_belt_plus.network.PickupNetworking::register);
         modBus.addListener(pureneko.conveyor_belt_plus.network.InsertionNetworking::register);
+        modBus.addListener(pureneko.conveyor_belt_plus.network.BeltUpgradeNetworking::register);
+        modBus.addListener(pureneko.conveyor_belt_plus.network.RtsActionNetworking::register);
         modBus.addListener(pureneko.conveyor_belt_plus.network.RtsNetworking::register);
     }
 

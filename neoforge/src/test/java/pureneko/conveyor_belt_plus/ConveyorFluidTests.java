@@ -93,7 +93,7 @@ public final class ConveyorFluidTests {
         return storage;
     }
     private static ChuteBlockEntity chute(GameTestHelper ctx, BlockPos pos, Block block, Direction facing) {
-        ctx.getLevel().setBlockAndUpdate(pos, block.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, facing));
+        ctx.getLevel().setBlockAndUpdate(pos, block.defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, facing));
         return (ChuteBlockEntity) ctx.getLevel().getBlockEntity(pos);
     }
     private static ChuteBlockEntity route(GameTestHelper ctx, Block block, int z) {
@@ -369,4 +369,38 @@ public final class ConveyorFluidTests {
         ctx.succeed();
     }
 
+
+    @GameTest(template="empty", templateNamespace=ConveyorBeltPlus.MOD_ID)
+    public static void verticalFluidSidedBlockingAndConservation(GameTestHelper ctx) {
+        double speed=ConveyorConfig.SPEEDS[0].get();
+        try {
+            ConveyorConfig.SPEEDS[0].set(64.0);
+            for (boolean up : new boolean[]{true,false}) {
+                var low=ctx.absolutePos(new BlockPos(2,1,up?2:5));
+                var high=low.above(4);
+                var lowerStorage=storage(ctx,low,6000);
+                var upperStorage=storage(ctx,high,6000);
+                lowerStorage.onlySide=Direction.UP; upperStorage.onlySide=Direction.DOWN;
+                var lower=chute(ctx,low.above(),BlockContent.FLUID_CHUTE.get(),Direction.UP);
+                var upper=chute(ctx,high.below(),BlockContent.FLUID_CHUTE.get(),Direction.DOWN);
+                var source=up?lower:upper;
+                var destination=up?upper:lower;
+                var sourceTank=up?lowerStorage:upperStorage;
+                var destinationTank=up?upperStorage:lowerStorage;
+                sourceTank.tank.setFluid(new FluidStack(Fluids.WATER,3000));
+                destinationTank.tank.setFluid(new FluidStack(Fluids.WATER,5000));
+                ctx.assertTrue(source.connectOutgoing(source.getOwnFacing(),destination.getBlockPos(),destination.getOwnFacing(),List.of(),1),"vertical fluid route connects");
+                destination.connectIncoming(destination.getOwnFacing(),source.getBlockPos());
+                for(int i=0;i<12;i++) tick(source);
+                int queued=source.pickupAccess(source.getOwnFacing()).items().stream().mapToInt(packet->FluidPackets.amount(packet.stack)).sum();
+                ctx.assertTrue(sourceTank.tank.getFluidAmount()+destinationTank.tank.getFluidAmount()+queued==8000,"full destination retains every mB on lift");
+                ctx.assertTrue(queued>0 && destinationTank.tank.getFluidAmount()==6000,"fluid waits on its carrier when blocked");
+                destinationTank.tank.drain(3000,IFluidHandler.FluidAction.EXECUTE);
+                for(int i=0;i<12;i++) tick(source);
+                ctx.assertTrue(sourceTank.tank.isEmpty() && source.pickupAccess(source.getOwnFacing()).items().isEmpty() && destinationTank.tank.getFluidAmount()==5000,"both directions resume without loss");
+                STORAGE.remove(low); STORAGE.remove(high);
+            }
+        } finally { ConveyorConfig.SPEEDS[0].set(speed); }
+        ctx.succeed();
+    }
 }

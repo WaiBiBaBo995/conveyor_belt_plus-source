@@ -23,7 +23,7 @@ tasks.register('sourceZip', Zip) {
 
     into("${rootProject.archives_name}-${project.version}-source") {
         from(rootDir) {
-            include '.gitignore', '.gitattributes', 'LICENSE', 'readme.md', 'CHANGELOG.md'
+            include '.gitignore', '.gitattributes', 'LICENSE', 'README.md', 'CHANGELOG.md'
             include 'build.gradle', 'settings.gradle', 'gradle.properties', 'gradlew.bat'
             include 'gradle/wrapper/gradle-wrapper.jar', 'gradle/wrapper/gradle-wrapper.properties'
             include 'neoforge/build.gradle', 'neoforge/gradle.properties', 'neoforge/src/**'

@@ -42,8 +42,8 @@ public final class ConveyorInsertionTests {
         for (int existing = 0; existing <= 2; existing++) {
             var start = ctx.absolutePos(new BlockPos(2, 2, 3 + existing * 4));
             var end = start.east(10);
-            if (existing >= 1) world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
-            if (existing == 2) world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+            if (existing >= 1) world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
+            if (existing == 2) world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
             var player = ctx.makeMockPlayer(GameType.SURVIVAL);
             for (int slot = 0; slot < player.getInventory().items.size(); slot++) player.getInventory().setItem(slot, new ItemStack(Items.STONE, 64));
             var belt = new ItemStack(ItemContent.BELT.get());
@@ -66,7 +66,7 @@ public final class ConveyorInsertionTests {
                     && offhand.getHoverName().getString().equals("Reserved interface"), "refund retains interface variant and data");
             ctx.assertTrue((existing >= 1 || world.isEmptyBlock(start)) && (existing == 2 || world.isEmptyBlock(end)), "temporary endpoints rolled back");
             ctx.assertTrue(world.getEntitiesOfClass(ItemEntity.class, new AABB(start.getCenter(), end.getCenter()).inflate(1), e -> true).isEmpty(), "failure spawns no construction drops");
-            if (existing >= 1) world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
+            if (existing >= 1) world.setBlockAndUpdate(start, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
             belt.set(ComponentContent.BELT_DIR.get(), Direction.EAST);
             ctx.assertTrue(ItemContent.BELT.get().useOn(use).consumesAction(), "same held belt can retry successfully");
             ctx.assertTrue(player.getMainHandItem().isEmpty() && player.getOffhandItem().isEmpty(), "successful retry consumes exactly one belt and required interfaces");
@@ -79,8 +79,8 @@ public final class ConveyorInsertionTests {
         var world = ctx.getLevel();
         var start = ctx.absolutePos(new BlockPos(2, 2, 5));
         var end = start.east(10);
-        world.setBlockAndUpdate(start, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.EAST));
-        world.setBlockAndUpdate(end, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(start, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.EAST));
+        world.setBlockAndUpdate(end, BlockContent.UNIVERSAL_CHUTE.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
         var chute = (ChuteBlockEntity) world.getBlockEntity(start);
         ctx.assertTrue(chute.connectOutgoing(Direction.EAST, end, Direction.WEST, java.util.List.of(), 1), "empty belt ready");
         var player = ctx.makeMockPlayer(GameType.SURVIVAL);
@@ -147,7 +147,7 @@ public final class ConveyorInsertionTests {
         var start = ctx.absolutePos(new BlockPos(2, 2, 5));
         var end = start.east(10);
         world.setBlockAndUpdate(start, BlockContent.SPLITTER.get().defaultBlockState());
-        world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        world.setBlockAndUpdate(end, BlockContent.CHUTE_BLOCK.get().defaultBlockState().setValue(pureneko.conveyor_belt_plus.blocks.ChuteBlock.FACING, Direction.WEST));
         var splitter = (ConveyorSplitterBlockEntity) world.getBlockEntity(start);
         ctx.assertTrue(splitter.connectOutgoing(Direction.EAST, end, Direction.WEST, java.util.List.of(), 3), "splitter output exists");
         var stack = new ItemStack(Items.REDSTONE, 12);

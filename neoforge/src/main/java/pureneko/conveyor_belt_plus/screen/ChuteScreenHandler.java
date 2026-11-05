@@ -91,7 +91,7 @@ public class ChuteScreenHandler extends AbstractContainerMenu {
             @Override public int get() { return getFacing().get3DDataValue(); }
             @Override public void set(int value) {
                 var direction = Direction.from3DDataValue(value);
-                facing = direction.getAxis().isHorizontal() ? direction : Direction.NORTH;
+                facing = direction;
             }
         });
         for (int row = 0; row < 3; row++) for (int col = 0; col < 9; col++)

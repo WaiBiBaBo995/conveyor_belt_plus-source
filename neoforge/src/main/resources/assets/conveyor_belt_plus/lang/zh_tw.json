@@ -1,0 +1,13 @@
+{
+  "screen.conveyor_belt_plus.extraction.world_short.up": "上",
+  "screen.conveyor_belt_plus.extraction.world_short.down": "下",
+  "screen.conveyor_belt_plus.extraction.world_short.north": "北",
+  "screen.conveyor_belt_plus.extraction.world_short.south": "南",
+  "screen.conveyor_belt_plus.extraction.world_short.east": "東",
+  "screen.conveyor_belt_plus.extraction.world_short.west": "西",
+  "tooltip.conveyor_belt_plus.belt.upgrade": "潛行並右鍵輸送帶或起點介面，升級整條路線；閃爍投影顯示新等級外觀。",
+  "tooltip.conveyor_belt_plus.chute.upgrade": "潛行並右鍵低等級介面即可升級，保留設定並歸還舊介面。",
+  "tooltip.conveyor_belt_plus.belt.connect": "右鍵選擇起點，再選擇終點；頂底面預設水平放置，潛行時垂直放置。",
+  "tooltip.conveyor_belt_plus.universal_chute.replace": "潛行並右鍵同級或低等級的物品／流體介面，可保留連線與設定並替換。",
+  "tooltip.conveyor_belt_plus.chute.summary": "安裝在容器上裝卸貨物；點擊頂底面時潛行可垂直放置。"
+}

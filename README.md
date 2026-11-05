@@ -1,6 +1,6 @@
 # Conveyor Belt Plus （English）
 
-Conveyor Belt Plus 3.7.0 provides Minecraft 1.21.1 / NeoForge / Java 21, based on SimpleBelts. The independent Minecraft 1.20.1 / Forge / Java 17 port is maintained in the sibling `1.20.1forge` project. Mod ID: `conveyor_belt_plus`. Java package: `pureneko.conveyor_belt_plus`. Main class: `pureneko.conveyor_belt_plus.registry.ConveyorBeltPlus`.
+Conveyor Belt Plus 3.8.0 provides Minecraft 1.21.1 / NeoForge / Java 21, based on SimpleBelts. The independent Minecraft 1.20.1 / Forge / Java 17 port is maintained in the sibling `1.20.1forge` project. Mod ID: `conveyor_belt_plus`. Java package: `pureneko.conveyor_belt_plus`. Main class: `pureneko.conveyor_belt_plus.registry.ConveyorBeltPlus`.
 
 JEI, Jade and RTS Building are optional. Replace the previous jar rather than installing two versions together, and back up existing worlds before upgrading.
 
@@ -12,6 +12,12 @@ The upstream CC BY 4.0 license includes its warranty disclaimer. Project-origina
 
 
 ## Features
+
+- Interfaces attach to top/bottom container faces as well as sides. Top/bottom clicks default to horizontal; hold sneak for vertical placement, both with an interface item and automatic belt endpoints. Connect aligned UP/DOWN interfaces for a straight lift; each item/fluid batch rides a horizontal smooth-stone carrier. Use two interfaces on a shared chest/tank to change between horizontal and vertical routes.
+- Same/higher-tier universal interfaces replace item/fluid interfaces in place using sneak + right-click. Existing settings and connections remain; the newly supported domain uses normal defaults.
+- Sneak + right-click the belt surface with a higher-tier belt upgrades the whole route, with a flashing new-tier projection. One belt is consumed and the old tier is refunded in survival; unfinished connection drafts remain available.
+- Aimed cargo that fits your inventory/held fluid container shows a white silhouette outline. Terrain occludes it; ordinary server permission and visibility checks still apply.
+- Ordinary interface routes send continuous-motion snapshots at 10 Hz; loading, unloading and movement start/stop remain immediate. Construction previews and baked-model queries are cached.
 
 - Three item, fluid and universal interface tiers, with shared belts and splitters. Item IDs are now `item_chute`, `advanced_item_chute`, and `ultimate_item_chute`; old IDs migrate through registry aliases.
 - Fluid interfaces extract up to 1,000 / 16,000 / 64,000 mB per batch (configurable) using sided NeoForge fluid capabilities. Glass fluid parcels render the actual fluid sprite/tint, preserve components, and wait or partially unload when a destination tank fills.
@@ -34,7 +40,9 @@ The upstream CC BY 4.0 license includes its warranty disclaimer. Project-origina
 - Failed belt construction restores reserved interfaces to their original inventory/offhand slots and retains the held belt and retry draft, including with a full inventory. RTS supports insertion from held stacks and selected linked-storage items, as well as construction rollback.
 - Player-oriented tooltips: purpose, current statistics, basic controls, and Ctrl for extra help.
 
-- Optional RTS Building 1.1.7 integration: cursor-based belt preview, a per-builder endpoint draft across storage extractions, and remote empty-hand rendered-item pickup with RTS range/claim/capability checks.
+- After the first endpoint is selected in RTS, drag the right mouse button to move the camera without connecting; release without dragging to place the second endpoint. First-endpoint, support, upgrade and reset actions keep their existing behavior.
+
+- Optional RTS Building integration: continuous cursor/air construction previews, vertical placement with Shift, body upgrades and interface replacement, flashing upgrade previews and pickable cargo outlines. Builder drafts survive material extraction and upgrades. Refunds prefer linked storage, then player inventory, then drop overflow; all actions validate server materials, camera, range and permissions.
 - Optional Jade 15.10.6 integration: splitter buffer contents/count, chute filter icons, a text-only chute redstone mode line, and the aimed-at belt packet/count, using existing client synchronization without a new polling channel. Chute redstone mode has its own Jade display toggle.
 
 ## Configuration
@@ -76,10 +84,10 @@ Include optional JEI in the development client:
 .\gradlew.bat :neoforge:runClient -PwithJei=true
 ```
 
-Include the optional integrations (RTS 1.1.7 itself requires NeoForge 21.1.221 or newer):
+Include the optional integrations (RTS 1.1.7 itself requires NeoForge 21.1.221 or newer; the `withRts` test profile uses 21.1.234, while normal release builds retain 21.1.172):
 
 ```powershell
-.\gradlew.bat :neoforge:runClient '-PwithRts=true' '-PwithJade=true' '-PwithJei=true' '-Pneoforge_version=21.1.238'
+.\gradlew.bat :neoforge:runClient '-PwithRts=true' '-PwithJade=true' '-PwithJei=true' '-Prts_test_neoforge_version=21.1.234'
 ```
 
 The same properties on `:neoforge:runGameTest` additionally enable the real-RTS integration tests in `neoforge/src/compatTest/java` and the Jade text/snapshot tests in `neoforge/src/jadeTest/java`. Quote dotted property values in PowerShell.
@@ -92,7 +100,7 @@ Create a complete source distribution, including the Gradle wrapper, resources, 
 .\gradlew.bat sourceZip --no-daemon --max-workers=1 --console plain
 ```
 
-This runs all checks and writes `build/distributions/conveyor_belt_plus-3.7.0-source.zip`.
+This runs all checks and writes `build/distributions/conveyor_belt_plus-3.8.0-source.zip`.
 On Linux/macOS use `./gradlew` in place of `.\gradlew.bat`. Extract the archive, enter its root
 directory and run the same build command. Java 21 and internet access to download Gradle and
 dependencies are required on a new machine. Build caches, local worlds, IDE settings, reference
@@ -139,6 +147,8 @@ Conveyor Belt Plus 包含改编自 [SimpleBelts](https://github.com/Rearth/Simpl
 - 可选 RTS Building 1.1.7 集成：基于光标的传送带预览、跨存储抽取的每个建造者端点草稿，以及远程空手渲染物品拾取，带 RTS 范围/领地/能力检查。
 - 可选 Jade 15.10.6 集成：分流器缓冲内容/数量、滑槽过滤图标、仅文本的滑槽红石模式行，以及瞄准的传送带包裹/数量，使用现有客户端同步而不新增轮询通道。滑槽红石模式有自己的 Jade 显示开关。
 
+在 RTS 中选定第一个端点后，可按住右键拖动视角而不连接；不拖动并松开右键才放置第二端点。首次选点、支架、升级与清除草稿的操作保持现有方式。
+
 ## 配置
 
 所有设置现在使用原生 NeoForge `ModConfigSpec`，注册为 `SERVER` 配置，使用现有文件名 `conveyor_belt_plus.toml`。NeoForge 处理加载、验证、保存、文件监视和初始服务器到客户端同步。没有并行的运行时 TOML 解析器或自定义设置缓存。
@@ -179,10 +189,10 @@ Conveyor Belt Plus 包含改编自 [SimpleBelts](https://github.com/Rearth/Simpl
 .\gradlew.bat :neoforge:runClient -PwithJei=true
 ```
 
-包含可选集成（RTS 1.1.7 本身需要 NeoForge 21.1.221 或更新版本）：
+包含可选集成（RTS 1.1.7 本身需要 NeoForge 21.1.221 或更新版本；`withRts` 测试配置默认使用 21.1.234，普通发布构建仍使用 21.1.172）：
 
 ```powershell
-.\gradlew.bat :neoforge:runClient '-PwithRts=true' '-PwithJade=true' '-PwithJei=true' '-Pneoforge_version=21.1.238'
+.\gradlew.bat :neoforge:runClient '-PwithRts=true' '-PwithJade=true' '-PwithJei=true' '-Prts_test_neoforge_version=21.1.234'
 ```
 
 `:neoforge:runGameTest` 上的相同属性还会启用 `neoforge/src/compatTest/java` 中的真实 RTS 集成测试和 `neoforge/src/jadeTest/java` 中的 Jade 文本/快照测试。在 PowerShell 中为带点的属性值加引号。
@@ -195,7 +205,7 @@ Conveyor Belt Plus 包含改编自 [SimpleBelts](https://github.com/Rearth/Simpl
 .\gradlew.bat sourceZip --no-daemon --max-workers=1 --console plain
 ```
 
-这会运行所有检查并写入 `build/distributions/conveyor_belt_plus-3.7.0-source.zip`。
+这会运行所有检查并写入 `build/distributions/conveyor_belt_plus-3.8.0-source.zip`。
 在 Linux/macOS 上使用 `./gradlew` 代替 `.\gradlew.bat`。解压归档，进入其根目录并运行相同的构建命令。在新机器上需要 Java 21 和互联网访问以下载 Gradle 和依赖。构建缓存、本地世界、IDE 设置、参考图像、之前的归档和迁移备份会被排除。`clean` 删除生成的构建输出，包括源码分发。
 
 早期说明描述了那些版本；当前加载器要求和配置格式以上文为准。

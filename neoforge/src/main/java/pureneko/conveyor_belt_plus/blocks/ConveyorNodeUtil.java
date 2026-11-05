@@ -13,6 +13,7 @@ public final class ConveyorNodeUtil {
     }
 
     public static @Nullable ConveyorNode get(Level world, BlockPos pos) {
+        if (pos == null || !world.hasChunkAt(pos)) return null;
         BlockEntity entity = world.getBlockEntity(pos);
         return entity instanceof ConveyorNode node ? node : null;
     }

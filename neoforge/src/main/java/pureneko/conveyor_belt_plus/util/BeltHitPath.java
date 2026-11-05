@@ -16,12 +16,16 @@ public final class BeltHitPath {
         int count = Math.max(1, Math.min(4096, (int) Math.ceil(data.totalLength() / .375)));
         points = new Vec3[count + 1];
         segments = new AABB[count];
-        for (int i = 0; i <= count; i++) points[i] = SplineUtil.getPositionOnSpline(data, i / (float) count);
+        boolean vertical = data.isVertical();
+        for (int i = 0; i <= count; i++) {
+            points[i] = SplineUtil.getPositionOnSpline(data, i / (float) count);
+            points[i] = BeltGeometry.surfacePoint(data, points[i]);
+        }
         AABB all = null;
         for (int i = 0; i < count; i++) {
             var a = points[i]; var b = points[i + 1];
-            var box = new AABB(Math.min(a.x, b.x) - .34, Math.min(a.y, b.y) - .16, Math.min(a.z, b.z) - .34,
-                    Math.max(a.x, b.x) + .34, Math.max(a.y, b.y) + .04, Math.max(a.z, b.z) + .34);
+            var box = new AABB(Math.min(a.x, b.x) - .34, Math.min(a.y, b.y) - .16, Math.min(a.z, b.z) - (vertical ? .16 : .34),
+                    Math.max(a.x, b.x) + .34, Math.max(a.y, b.y) + .04, Math.max(a.z, b.z) + (vertical ? .04 : .34));
             segments[i] = box;
             all = all == null ? box : all.minmax(box);
         }

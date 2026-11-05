@@ -23,6 +23,11 @@ public final class ChutePlacementPlan {
         this.creative = creative;
     }
 
+    /** Same decision for direct placement, automatic endpoints and both client previews. */
+    public static Direction facing(Direction face, Direction horizontal, boolean sneak, boolean start) {
+        return face.getAxis().isVertical() && !sneak ? (start ? horizontal.getOpposite() : horizontal) : face;
+    }
+
     public static boolean isChute(ItemStack stack) {
         return !stack.isEmpty() && stack.getItem() instanceof BlockItem item
                 && item.getBlock() instanceof ChuteBlock;
@@ -69,7 +74,7 @@ public final class ChutePlacementPlan {
 
     public BlockState state(int endpoint, Direction facing) {
         return ((BlockItem) choices.get(endpoint).stack.getItem()).getBlock().defaultBlockState()
-                .setValue(HorizontalDirectionalBlock.FACING, facing);
+                .setValue(ChuteBlock.FACING, facing);
     }
 
     /** Also used for failure refunds, retaining the chosen tier and item components. */

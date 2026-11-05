@@ -18,6 +18,10 @@ public final class SplineUtil {
         return data.arcPath().position(t);
     }
 
+    public static Vec3[] getWindowOnSpline(ChuteBlockEntity.BeltData data, double from, double to) {
+        return data.arcPath().sampleWindow(from, to);
+    }
+
     /** Cached arc-length lookup on the original Hermite geometry; equal progress means equal distance. */
     public static final class ArcLengthPath {
         private final Vec3[] points;
@@ -41,7 +45,7 @@ public final class SplineUtil {
         public static ArcLengthPath create(List<Tuple<Vec3, Vec3>> controls, double[] lengths) {
             var samples = new ArrayList<Vec3>();
             var cumulative = new ArrayList<Double>();
-            samples.add(controls.getFirst().getA());
+            samples.add(controls.get(0).getA());
             cumulative.add(0d);
             var segmentStarts = new int[controls.size() - 1];
             var segmentEnds = new int[controls.size() - 1];
@@ -51,11 +55,11 @@ public final class SplineUtil {
                 var from = controls.get(segment);
                 var to = controls.get(segment + 1);
                 double tangentLength = lengths[segment] * 1.5;
-                int count = Math.clamp((int) Math.ceil(lengths[segment] * 32), 32, 4096);
+                int count = net.minecraft.util.Mth.clamp((int) Math.ceil(lengths[segment] * 32), 32, 4096);
                 for (int step = 1; step <= count; step++) {
                     var point = getPointOnHermiteSpline(from.getA(), from.getB().scale(tangentLength),
                             to.getA(), to.getB().scale(tangentLength), step / (double) count);
-                    distance += samples.getLast().distanceTo(point);
+                    distance += samples.get(samples.size() - 1).distanceTo(point);
                     samples.add(point);
                     cumulative.add(distance);
                 }
@@ -72,12 +76,36 @@ public final class SplineUtil {
             if (progress <= 0 || length() <= 0) return points[0];
             if (progress >= 1) return points[points.length - 1];
             double target = progress * length();
-            int index = java.util.Arrays.binarySearch(distances, target);
+            return sampleAt(java.util.Arrays.binarySearch(distances, target), target);
+        }
+
+        /**
+         * Samples both ends of a narrow ascending progress window with a single binary search.
+         * Rendering uses it to estimate travel direction without resolving the arc length twice.
+         */
+        public Vec3[] sampleWindow(double fromProgress, double toProgress) {
+            double total = length();
+            if (total <= 0) return new Vec3[] { points[0], points[0] };
+            double from = net.minecraft.util.Mth.clamp(fromProgress, 0, 1) * total;
+            int index = java.util.Arrays.binarySearch(distances, from);
+            int cursor = Math.max(0, (index >= 0 ? index : -index - 1) - 1);
+            return new Vec3[] { sampleAt(index, from), sampleAfter(cursor, net.minecraft.util.Mth.clamp(toProgress, 0, 1) * total) };
+        }
+
+        private Vec3 sampleAt(int index, double target) {
             if (index >= 0) return points[index];
             int next = -index - 1;
             int previous = Math.max(0, next - 1);
             double span = distances[next] - distances[previous];
             return points[previous].lerp(points[next], span > 0 ? (target - distances[previous]) / span : 0);
+        }
+
+        /** Walks forward from a known segment; both window samples are close together. */
+        private Vec3 sampleAfter(int cursor, double target) {
+            while (cursor + 1 < distances.length && distances[cursor + 1] <= target) cursor++;
+            if (cursor + 1 >= distances.length || distances[cursor] == target) return points[cursor];
+            double span = distances[cursor + 1] - distances[cursor];
+            return points[cursor].lerp(points[cursor + 1], span > 0 ? (target - distances[cursor]) / span : 0);
         }
     }
 

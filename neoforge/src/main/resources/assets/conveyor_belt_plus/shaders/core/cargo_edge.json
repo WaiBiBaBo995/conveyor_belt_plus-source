@@ -1,0 +1,35 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "srcalpha",
+    "dstrgb": "1-srcalpha"
+  },
+  "vertex": "conveyor_belt_plus:cargo_edge",
+  "fragment": "conveyor_belt_plus:cargo_edge",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    {
+      "name": "CargoMask"
+    },
+    {
+      "name": "MaskDepth"
+    },
+    {
+      "name": "SceneDepth"
+    }
+  ],
+  "uniforms": [
+    {
+      "name": "TexelSize",
+      "type": "float",
+      "count": 2,
+      "values": [
+        1,
+        1
+      ]
+    }
+  ]
+}
